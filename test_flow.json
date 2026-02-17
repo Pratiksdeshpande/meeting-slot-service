@@ -1,0 +1,182 @@
+{
+  "description": "Complete flow for finding meeting slot for 4 users across different timezones",
+  "flow": [
+    {
+      "step": 1,
+      "description": "Create User-A (New York)",
+      "method": "POST",
+      "endpoint": "/api/v1/users",
+      "request": {
+        "name": "Alice Johnson",
+        "email": "alice.johnson@example.com"
+      },
+      "note": "Timezone is not stored in User model - track separately if needed"
+    },
+    {
+      "step": 2,
+      "description": "Create User-B (Tokyo)",
+      "method": "POST",
+      "endpoint": "/api/v1/users",
+      "request": {
+        "name": "Bob Tanaka",
+        "email": "bob.tanaka@example.com"
+      }
+    },
+    {
+      "step": 3,
+      "description": "Create User-C (Mumbai)",
+      "method": "POST",
+      "endpoint": "/api/v1/users",
+      "request": {
+        "name": "Charlie Patel",
+        "email": "charlie.patel@example.com"
+      }
+    },
+    {
+      "step": 4,
+      "description": "Create User-D (Mumbai)",
+      "method": "POST",
+      "endpoint": "/api/v1/users",
+      "request": {
+        "name": "Diana Sharma",
+        "email": "diana.sharma@example.com"
+      }
+    },
+    {
+      "step": 5,
+      "description": "Create Event - Brainstorming Meeting (1 hour session)",
+      "method": "POST",
+      "endpoint": "/api/v1/events",
+      "note": "Replace {user_a_id} with the ID returned from step 1",
+      "request": {
+        "title": "Brainstorming meeting",
+        "description": "Cross-timezone team brainstorming session",
+        "duration_minutes": 60,
+        "organizer_id": "{user_a_id}"
+      }
+    },
+    {
+      "step": 6,
+      "description": "Add User-A as participant",
+      "method": "POST",
+      "endpoint": "/api/v1/events/{event_id}/participants",
+      "note": "Replace {event_id} with ID from step 5, {user_a_id} with ID from step 1",
+      "request": {
+        "user_id": "{user_a_id}"
+      }
+    },
+    {
+      "step": 7,
+      "description": "Add User-B as participant",
+      "method": "POST",
+      "endpoint": "/api/v1/events/{event_id}/participants",
+      "note": "Replace {event_id} with ID from step 5, {user_b_id} with ID from step 2",
+      "request": {
+        "user_id": "{user_b_id}"
+      }
+    },
+    {
+      "step": 8,
+      "description": "Add User-C as participant",
+      "method": "POST",
+      "endpoint": "/api/v1/events/{event_id}/participants",
+      "note": "Replace {event_id} with ID from step 5, {user_c_id} with ID from step 3",
+      "request": {
+        "user_id": "{user_c_id}"
+      }
+    },
+    {
+      "step": 9,
+      "description": "Add User-D as participant",
+      "method": "POST",
+      "endpoint": "/api/v1/events/{event_id}/participants",
+      "note": "Replace {event_id} with ID from step 5, {user_d_id} with ID from step 4",
+      "request": {
+        "user_id": "{user_d_id}"
+      }
+    },
+    {
+      "step": 10,
+      "description": "Submit User-A availability (2PM-4PM UTC)",
+      "method": "POST",
+      "endpoint": "/api/v1/events/{event_id}/participants/{user_a_id}/availability",
+      "note": "Replace {event_id} with ID from step 5, {user_a_id} with ID from step 1",
+      "request": {
+        "available_slots": [
+          {
+            "start_time": "2026-02-18T14:00:00Z",
+            "end_time": "2026-02-18T16:00:00Z",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    },
+    {
+      "step": 11,
+      "description": "Submit User-B availability (2PM-3PM UTC)",
+      "method": "POST",
+      "endpoint": "/api/v1/events/{event_id}/participants/{user_b_id}/availability",
+      "note": "Replace {event_id} with ID from step 5, {user_b_id} with ID from step 2",
+      "request": {
+        "available_slots": [
+          {
+            "start_time": "2026-02-18T14:00:00Z",
+            "end_time": "2026-02-18T15:00:00Z",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    },
+    {
+      "step": 12,
+      "description": "Submit User-C availability (11AM-3PM UTC)",
+      "method": "POST",
+      "endpoint": "/api/v1/events/{event_id}/participants/{user_c_id}/availability",
+      "note": "Replace {event_id} with ID from step 5, {user_c_id} with ID from step 3",
+      "request": {
+        "available_slots": [
+          {
+            "start_time": "2026-02-18T11:00:00Z",
+            "end_time": "2026-02-18T15:00:00Z",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    },
+    {
+      "step": 13,
+      "description": "Submit User-D availability (2PM-4PM UTC)",
+      "method": "POST",
+      "endpoint": "/api/v1/events/{event_id}/participants/{user_d_id}/availability",
+      "note": "Replace {event_id} with ID from step 5, {user_d_id} with ID from step 4",
+      "request": {
+        "available_slots": [
+          {
+            "start_time": "2026-02-18T14:00:00Z",
+            "end_time": "2026-02-18T16:00:00Z",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    },
+    {
+      "step": 14,
+      "description": "Get meeting slot recommendations",
+      "method": "GET",
+      "endpoint": "/api/v1/events/{event_id}/recommendations",
+      "note": "Replace {event_id} with ID from step 5. Expected result: 2PM-3PM UTC slot (14:00-15:00) where all users overlap",
+      "request": null
+    }
+  ],
+  "expected_result": {
+    "optimal_slot": "2026-02-18T14:00:00Z to 2026-02-18T15:00:00Z",
+    "reason": "This is the only 1-hour window where all 4 users are available (User-B limits the window to 2PM-3PM UTC)"
+  },
+  "availability_summary": {
+    "user_a": "14:00-16:00 UTC (9AM-11AM New York)",
+    "user_b": "14:00-15:00 UTC (11PM-12AM Tokyo next day)",
+    "user_c": "11:00-15:00 UTC (4:30PM-8:30PM Mumbai)",
+    "user_d": "14:00-16:00 UTC (7:30PM-9:30PM Mumbai)",
+    "overlap": "14:00-15:00 UTC (1 hour)"
+  }
+}

@@ -1,0 +1,30 @@
+# Terraform Variables Example
+# Copy this file to terraform.tfvars and update values
+
+# AWS Region
+aws_region = "us-east-1"
+
+# Environment name
+environment = "dev"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.20.0/24"]
+
+# EC2 Configuration
+ec2_instance_type = "t3.micro"
+ec2_key_name      = ""  # Optional: SSH key name for EC2 access
+
+# RDS Configuration
+rds_instance_class = "db.t3.micro"
+rds_db_name        = "meetingslots"
+rds_username       = "admin"
+# Note: rds_password should be provided via environment variable TF_VAR_rds_password
+# or via a secure secrets file that is NOT committed to version control
+
+# API Gateway Configuration
+api_gateway_stage = "v1"
+
+# Application Configuration
+app_port = 8080

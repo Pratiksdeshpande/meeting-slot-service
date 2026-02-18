@@ -77,6 +77,27 @@ func (r *participantRepository) GetEventParticipants(ctx context.Context, eventI
 	return participants, nil
 }
 
+func (r *participantRepository) GetParticipant(ctx context.Context, eventID, userID string) (*models.EventParticipant, error) {
+	db, err := r.db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database connection: %w", err)
+	}
+
+	query := `SELECT id, event_id, user_id, status, created_at, updated_at
+			  FROM event_participants
+			  WHERE event_id = ? AND user_id = ?`
+
+	var p models.EventParticipant
+	err = db.QueryRowContext(ctx, query, eventID, userID).Scan(
+		&p.ID, &p.EventID, &p.UserID, &p.Status, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("participant not found: %w", err)
+	}
+
+	return &p, nil
+}
+
 func (r *participantRepository) RemoveParticipant(ctx context.Context, eventID, userID string) error {
 	db, err := r.db.DB()
 	if err != nil {

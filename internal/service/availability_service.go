@@ -12,6 +12,7 @@ type AvailabilityService struct {
 	availabilityRepo repository.AvailabilityRepository
 	eventRepo        repository.EventRepository
 	participantRepo  repository.ParticipantRepository
+	userRepo         repository.UserRepository
 }
 
 // NewAvailabilityService creates a new availability service
@@ -19,11 +20,13 @@ func NewAvailabilityService(
 	availabilityRepo repository.AvailabilityRepository,
 	eventRepo repository.EventRepository,
 	participantRepo repository.ParticipantRepository,
+	userRepo repository.UserRepository,
 ) *AvailabilityService {
 	return &AvailabilityService{
 		availabilityRepo: availabilityRepo,
 		eventRepo:        eventRepo,
 		participantRepo:  participantRepo,
+		userRepo:         userRepo,
 	}
 }
 
@@ -32,7 +35,19 @@ func (s *AvailabilityService) SubmitAvailability(ctx context.Context, eventID, u
 	// Check if event exists
 	_, err := s.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
-		return fmt.Errorf("event not found: %w", err)
+		return fmt.Errorf("event not found")
+	}
+
+	// Check if user exists
+	_, err = s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+
+	// Check if user is a participant of this event
+	_, err = s.participantRepo.GetParticipant(ctx, eventID, userID)
+	if err != nil {
+		return fmt.Errorf("participant not found")
 	}
 
 	// Validate slots
@@ -60,7 +75,19 @@ func (s *AvailabilityService) UpdateAvailability(ctx context.Context, eventID, u
 	// Check if event exists
 	_, err := s.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
-		return fmt.Errorf("event not found: %w", err)
+		return fmt.Errorf("event not found")
+	}
+
+	// Check if user exists
+	_, err = s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+
+	// Check if user is a participant of this event
+	_, err = s.participantRepo.GetParticipant(ctx, eventID, userID)
+	if err != nil {
+		return fmt.Errorf("participant not found")
 	}
 
 	// Validate and set IDs

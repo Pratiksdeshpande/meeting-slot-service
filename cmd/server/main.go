@@ -51,7 +51,7 @@ func main() {
 	// Initialize services
 	userService := service.NewUserService(userRepo)
 	eventService := service.NewEventService(eventRepo, userRepo, participantRepo)
-	availabilityService := service.NewAvailabilityService(availabilityRepo, eventRepo, participantRepo)
+	availabilityService := service.NewAvailabilityService(availabilityRepo, eventRepo, participantRepo, userRepo)
 	recommendationService := service.NewRecommendationService(eventRepo, availabilityRepo, participantRepo)
 
 	// Initialize handlers
@@ -114,6 +114,7 @@ func setupRouter(
 
 	// User routes
 	api.HandleFunc("/users", userHandler.CreateUser).Methods(http.MethodPost)
+	api.HandleFunc("/users", userHandler.ListUsers).Methods(http.MethodGet)
 	api.HandleFunc("/users/{id}", userHandler.GetUser).Methods(http.MethodGet)
 	api.HandleFunc("/users/{id}", userHandler.UpdateUser).Methods(http.MethodPut)
 	api.HandleFunc("/users/{id}", userHandler.DeleteUser).Methods(http.MethodDelete)

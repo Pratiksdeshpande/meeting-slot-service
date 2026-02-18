@@ -87,6 +87,14 @@ func (m *MockParticipantRepository) GetEventParticipants(ctx context.Context, ev
 	return args.Get(0).([]models.EventParticipant), args.Error(1)
 }
 
+func (m *MockParticipantRepository) GetParticipant(ctx context.Context, eventID, userID string) (*models.EventParticipant, error) {
+	args := m.Called(ctx, eventID, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.EventParticipant), args.Error(1)
+}
+
 func (m *MockParticipantRepository) RemoveParticipant(ctx context.Context, eventID, userID string) error {
 	args := m.Called(ctx, eventID, userID)
 	return args.Error(0)

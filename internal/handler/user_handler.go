@@ -6,6 +6,7 @@ import (
 	"meeting-slot-service/internal/service"
 	"meeting-slot-service/internal/utils"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -83,4 +84,37 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ListUsers handles GET /api/v1/users
+func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	// Parse pagination parameters
+	page := 1
+	limit := 20
+
+	if p := query.Get("page"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+	if l := query.Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	users, err := h.userService.ListUsers(r.Context(), page, limit)
+	if err != nil {
+		utils.WriteInternalError(w, "Failed to list users")
+		return
+	}
+
+	// Ensure empty array instead of null when no users
+	if users == nil {
+		users = []*models.User{}
+	}
+
+	utils.WriteSuccess(w, http.StatusOK, users)
 }

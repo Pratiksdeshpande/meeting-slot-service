@@ -116,20 +116,39 @@ func (h *EventHandler) AddParticipant(w http.ResponseWriter, r *http.Request) {
 	eventID := vars["id"]
 
 	var req struct {
-		UserID string `json:"user_id"`
+		UserIDs []string `json:"user_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.WriteBadRequest(w, "Invalid request body")
 		return
 	}
 
-	if err := h.eventService.AddParticipant(r.Context(), eventID, req.UserID); err != nil {
-		utils.WriteBadRequest(w, err.Error())
+	if len(req.UserIDs) == 0 {
+		utils.WriteBadRequest(w, "user_ids array is required and cannot be empty")
 		return
 	}
 
-	utils.WriteSuccess(w, http.StatusCreated, map[string]string{
-		"message": "Participant added successfully",
+	// Track results
+	var added []string
+	var failed []map[string]string
+
+	for _, userID := range req.UserIDs {
+		if err := h.eventService.AddParticipant(r.Context(), eventID, userID); err != nil {
+			failed = append(failed, map[string]string{
+				"user_id": userID,
+				"error":   err.Error(),
+			})
+		} else {
+			added = append(added, userID)
+		}
+	}
+
+	utils.WriteSuccess(w, http.StatusCreated, map[string]interface{}{
+		"message":         "Participants processed",
+		"added_count":     len(added),
+		"failed_count":    len(failed),
+		"added_user_ids":  added,
+		"failed_user_ids": failed,
 	})
 }
 
@@ -156,6 +175,11 @@ func (h *EventHandler) GetParticipants(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		utils.WriteInternalError(w, "Failed to get participants")
 		return
+	}
+
+	// Return empty array instead of null when no participants
+	if participants == nil {
+		participants = []models.EventParticipant{}
 	}
 
 	utils.WriteSuccess(w, http.StatusOK, participants)

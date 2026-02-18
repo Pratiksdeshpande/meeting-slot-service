@@ -87,6 +87,11 @@ func (h *AvailabilityHandler) GetAvailability(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Return empty array instead of null when no availability
+	if slots == nil {
+		slots = []models.AvailabilitySlot{}
+	}
+
 	utils.WriteSuccess(w, http.StatusOK, slots)
 }
 

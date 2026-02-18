@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"meeting-slot-service/internal/database"
 	"meeting-slot-service/internal/models"
@@ -23,9 +24,14 @@ func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 	if err != nil {
 		return fmt.Errorf("failed to get database connection: %w", err)
 	}
+
+	now := time.Now().UTC()
+	user.CreatedAt = now
+	user.UpdatedAt = now
+
 	query := `INSERT INTO users (id, name, email, created_at, updated_at) 
-			  VALUES (?, ?, ?, NOW(), NOW())`
-	_, err = db.ExecContext(ctx, query, user.ID, user.Name, user.Email)
+			  VALUES (?, ?, ?, ?, ?)`
+	_, err = db.ExecContext(ctx, query, user.ID, user.Name, user.Email, user.CreatedAt, user.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}

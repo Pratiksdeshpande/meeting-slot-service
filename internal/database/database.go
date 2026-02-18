@@ -90,6 +90,11 @@ func (d *Database) connect() error {
 
 // DB returns the underlying sql.DB connection, connecting lazily if needed
 func (d *Database) DB() (*sql.DB, error) {
+	// If db is already set (e.g., for testing), return it directly
+	if d.db != nil {
+		return d.db, nil
+	}
+
 	if err := d.connect(); err != nil {
 		return nil, err
 	}
@@ -216,4 +221,9 @@ func (d *Database) Close() error {
 		return d.db.Close()
 	}
 	return nil
+}
+
+// SetDB sets the database connection (used for testing)
+func (d *Database) SetDB(db *sql.DB) {
+	d.db = db
 }

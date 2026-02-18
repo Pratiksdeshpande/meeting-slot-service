@@ -37,6 +37,7 @@ type AvailabilityRepository interface {
 type ParticipantRepository interface {
 	AddParticipant(ctx context.Context, participant *models.EventParticipant) error
 	GetEventParticipants(ctx context.Context, eventID string) ([]models.EventParticipant, error)
+	GetParticipant(ctx context.Context, eventID, userID string) (*models.EventParticipant, error)
 	RemoveParticipant(ctx context.Context, eventID, userID string) error
 	UpdateParticipantStatus(ctx context.Context, eventID, userID, status string) error
 }

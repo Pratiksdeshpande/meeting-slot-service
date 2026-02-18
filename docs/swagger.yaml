@@ -37,7 +37,6 @@ tags:
 
 paths:
   /health:
-
     get:
       tags:
         - Health
@@ -54,7 +53,6 @@ paths:
                 example: "OK"
 
   /api/v1/users:
-
     post:
       tags:
         - Users
@@ -67,22 +65,71 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateUserRequest'
+            example:
+              name: "John Doe"
+              email: "john.doe@example.com"
       responses:
         '201':
           description: User created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/UserResponse'
+              example:
+                success: true
+                data:
+                  id: "usr_abc123"
+                  name: "John Doe"
+                  email: "john.doe@example.com"
+                  created_at: "2026-02-18T10:30:00Z"
+                  updated_at: "2026-02-18T10:30:00Z"
         '400':
           description: Invalid request body
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "BAD_REQUEST"
+                  message: "Invalid email format"
+
+    get:
+      tags:
+        - Users
+      summary: List all users
+      description: Retrieves a list of users with optional pagination
+      operationId: listUsers
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+              example:
+                success: true
+                data:
+                  - id: "usr_abc123"
+                    name: "John Doe"
+                    email: "john.doe@example.com"
+                    created_at: "2026-02-18T10:30:00Z"
+                    updated_at: "2026-02-18T10:30:00Z"
+                  - id: "usr_def456"
+                    name: "Jane Smith"
+                    email: "jane.smith@example.com"
+                    created_at: "2026-02-18T11:00:00Z"
+                    updated_at: "2026-02-18T11:00:00Z"
+                pagination:
+                  page: 1
+                  limit: 20
+                  total: 2
 
   /api/v1/users/{id}:
-
     get:
       tags:
         - Users
@@ -90,26 +137,33 @@ paths:
       description: Retrieves a specific user by their unique identifier
       operationId: getUserById
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: User unique identifier
-          schema:
-            type: string
-            example: "usr_abc123"
+        - $ref: '#/components/parameters/UserIdParam'
       responses:
         '200':
           description: User found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/UserResponse'
+              example:
+                success: true
+                data:
+                  id: "usr_abc123"
+                  name: "John Doe"
+                  email: "john.doe@example.com"
+                  created_at: "2026-02-18T10:30:00Z"
+                  updated_at: "2026-02-18T10:30:00Z"
         '404':
           description: User not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "NOT_FOUND"
+                  message: "User not found"
 
     put:
       tags:
@@ -118,26 +172,31 @@ paths:
       description: Updates an existing user's information
       operationId: updateUser
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: User unique identifier
-          schema:
-            type: string
-            example: "usr_abc123"
+        - $ref: '#/components/parameters/UserIdParam'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateUserRequest'
+            example:
+              name: "John Doe Updated"
+              email: "john.updated@example.com"
       responses:
         '200':
           description: User updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/UserResponse'
+              example:
+                success: true
+                data:
+                  id: "usr_abc123"
+                  name: "John Doe Updated"
+                  email: "john.updated@example.com"
+                  created_at: "2026-02-18T10:30:00Z"
+                  updated_at: "2026-02-18T14:30:00Z"
         '400':
           description: Invalid request body
           content:
@@ -158,13 +217,7 @@ paths:
       description: Deletes a user by their unique identifier
       operationId: deleteUser
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: User unique identifier
-          schema:
-            type: string
-            example: "usr_abc123"
+        - $ref: '#/components/parameters/UserIdParam'
       responses:
         '204':
           description: User deleted successfully
@@ -176,7 +229,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/events:
-
     post:
       tags:
         - Events
@@ -189,13 +241,50 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateEventRequest'
+            example:
+              title: "Weekly Team Standup"
+              description: "Weekly synchronization meeting"
+              organizer_id: "usr_abc123"
+              duration_minutes: 60
+              proposed_slots:
+                - start_time: "2026-02-01T14:00:00+05:30"
+                  end_time: "2026-02-01T16:00:00+05:30"
+                  timezone: "Asia/Kolkata"
+                - start_time: "2026-02-01T17:00:00+05:30"
+                  end_time: "2026-02-01T19:00:00+05:30"
+                  timezone: "Asia/Kolkata"
       responses:
         '201':
           description: Event created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/EventResponse'
+              example:
+                success: true
+                data:
+                  id: "evt_xyz789"
+                  title: "Weekly Team Standup"
+                  description: "Weekly synchronization meeting"
+                  organizer_id: "usr_abc123"
+                  duration_minutes: 60
+                  status: "pending"
+                  proposed_slots:
+                    - id: 1
+                      event_id: "evt_xyz789"
+                      start_time: "2026-02-01T14:00:00+05:30"
+                      end_time: "2026-02-01T16:00:00+05:30"
+                      timezone: "Asia/Kolkata"
+                      created_at: "2026-02-18T10:30:00Z"
+                    - id: 2
+                      event_id: "evt_xyz789"
+                      start_time: "2026-02-01T17:00:00+05:30"
+                      end_time: "2026-02-01T19:00:00+05:30"
+                      timezone: "Asia/Kolkata"
+                      created_at: "2026-02-18T10:30:00Z"
+                  participants: []
+                  created_at: "2026-02-18T10:30:00Z"
+                  updated_at: "2026-02-18T10:30:00Z"
         '400':
           description: Invalid request body
           content:
@@ -215,24 +304,16 @@ paths:
           description: Filter by organizer ID
           schema:
             type: string
+          example: "usr_abc123"
         - name: status
           in: query
           description: Filter by event status
           schema:
             type: string
             enum: [pending, confirmed, cancelled]
-        - name: page
-          in: query
-          description: Page number
-          schema:
-            type: integer
-            default: 1
-        - name: limit
-          in: query
-          description: Items per page
-          schema:
-            type: integer
-            default: 20
+          example: "pending"
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
       responses:
         '200':
           description: List of events
@@ -240,9 +321,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EventListResponse'
+              example:
+                success: true
+                data:
+                  - id: "evt_xyz789"
+                    title: "Weekly Team Standup"
+                    description: "Weekly synchronization meeting"
+                    organizer_id: "usr_abc123"
+                    duration_minutes: 60
+                    status: "pending"
+                    proposed_slots: []
+                    participants: []
+                    created_at: "2026-02-18T10:30:00Z"
+                    updated_at: "2026-02-18T10:30:00Z"
+                pagination:
+                  page: 1
+                  limit: 20
+                  total: 1
 
   /api/v1/events/{id}:
-
     get:
       tags:
         - Events
@@ -250,26 +347,56 @@ paths:
       description: Retrieves a specific event by its unique identifier
       operationId: getEventById
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
+        - $ref: '#/components/parameters/EventIdParam'
       responses:
         '200':
           description: Event found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/EventResponse'
+              example:
+                success: true
+                data:
+                  id: "evt_xyz789"
+                  title: "Weekly Team Standup"
+                  description: "Weekly synchronization meeting"
+                  organizer_id: "usr_abc123"
+                  duration_minutes: 60
+                  status: "pending"
+                  proposed_slots:
+                    - id: 1
+                      event_id: "evt_xyz789"
+                      start_time: "2026-02-01T14:00:00+05:30"
+                      end_time: "2026-02-01T16:00:00+05:30"
+                      timezone: "Asia/Kolkata"
+                      created_at: "2026-02-18T10:30:00Z"
+                  participants:
+                    - id: 1
+                      event_id: "evt_xyz789"
+                      user_id: "usr_def456"
+                      status: "invited"
+                      created_at: "2026-02-18T10:35:00Z"
+                      updated_at: "2026-02-18T10:35:00Z"
+                      user:
+                        id: "usr_def456"
+                        name: "Jane Smith"
+                        email: "jane.smith@example.com"
+                        created_at: "2026-02-18T11:00:00Z"
+                        updated_at: "2026-02-18T11:00:00Z"
+                  created_at: "2026-02-18T10:30:00Z"
+                  updated_at: "2026-02-18T10:30:00Z"
         '404':
           description: Event not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "NOT_FOUND"
+                  message: "Event not found"
 
     put:
       tags:
@@ -278,26 +405,24 @@ paths:
       description: Updates an existing event's information
       operationId: updateEvent
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
+        - $ref: '#/components/parameters/EventIdParam'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateEventRequest'
+            example:
+              title: "Weekly Team Sync - Updated"
+              description: "Updated meeting description"
+              duration_minutes: 45
       responses:
         '200':
           description: Event updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/EventResponse'
         '400':
           description: Invalid request body
           content:
@@ -318,13 +443,7 @@ paths:
       description: Soft deletes an event by its unique identifier
       operationId: deleteEvent
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
+        - $ref: '#/components/parameters/EventIdParam'
       responses:
         '204':
           description: Event deleted successfully
@@ -336,42 +455,39 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/events/{id}/participants:
-
     post:
       tags:
         - Participants
-      summary: Add participant to event
-      description: Adds a participant to an existing event
-      operationId: addParticipant
+      summary: Add participants to event
+      description: Adds one or more participants to an event
+      operationId: addParticipants
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
+        - $ref: '#/components/parameters/EventIdParam'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AddParticipantRequest'
+            example:
+              user_ids: ["usr_def456", "usr_ghi789", "usr_jkl012"]
       responses:
         '201':
-          description: Participant added successfully
+          description: Participants added successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/AddParticipantResponse'
+              example:
+                success: true
+                data:
+                  message: "Participants processed"
+                  added_count: 3
+                  failed_count: 0
+                  added_user_ids: ["usr_def456", "usr_ghi789", "usr_jkl012"]
+                  failed_user_ids: []
         '400':
-          description: Invalid request body
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Event not found
+          description: Invalid request
           content:
             application/json:
               schema:
@@ -384,20 +500,41 @@ paths:
       description: Retrieves all participants for a specific event
       operationId: getEventParticipants
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
+        - $ref: '#/components/parameters/EventIdParam'
       responses:
         '200':
           description: List of participants
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/ParticipantListResponse'
+              example:
+                success: true
+                data:
+                  - id: 1
+                    event_id: "evt_xyz789"
+                    user_id: "usr_def456"
+                    status: "invited"
+                    created_at: "2026-02-18T10:35:00Z"
+                    updated_at: "2026-02-18T10:35:00Z"
+                    user:
+                      id: "usr_def456"
+                      name: "Jane Smith"
+                      email: "jane.smith@example.com"
+                      created_at: "2026-02-18T11:00:00Z"
+                      updated_at: "2026-02-18T11:00:00Z"
+                  - id: 2
+                    event_id: "evt_xyz789"
+                    user_id: "usr_ghi789"
+                    status: "accepted"
+                    created_at: "2026-02-18T10:35:00Z"
+                    updated_at: "2026-02-18T12:00:00Z"
+                    user:
+                      id: "usr_ghi789"
+                      name: "Bob Johnson"
+                      email: "bob.j@example.com"
+                      created_at: "2026-02-18T11:15:00Z"
+                      updated_at: "2026-02-18T11:15:00Z"
         '404':
           description: Event not found
           content:
@@ -406,7 +543,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/events/{id}/participants/{user_id}:
-
     delete:
       tags:
         - Participants
@@ -414,100 +550,74 @@ paths:
       description: Removes a participant from an event
       operationId: removeParticipant
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
-        - name: user_id
-          in: path
-          required: true
-          description: User unique identifier
-          schema:
-            type: string
-            example: "usr_abc123"
+        - $ref: '#/components/parameters/EventIdParam'
+        - $ref: '#/components/parameters/UserIdPathParam'
       responses:
         '204':
           description: Participant removed successfully
         '404':
-          description: Event or participant not found
+          description: Participant not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/events/{id}/participants/{user_id}/availability:
-
     post:
       tags:
         - Availability
       summary: Submit availability
-      description: Submit availability slots for a participant in an event
+      description: Submits participant's availability for an event
       operationId: submitAvailability
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
-        - name: user_id
-          in: path
-          required: true
-          description: User unique identifier
-          schema:
-            type: string
-            example: "usr_abc123"
+        - $ref: '#/components/parameters/EventIdParam'
+        - $ref: '#/components/parameters/UserIdPathParam'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AvailabilityRequest'
+            example:
+              available_slots:
+                - start_time: "2026-02-01T14:00:00+05:30"
+                  end_time: "2026-02-01T16:00:00+05:30"
+                  timezone: "Asia/Kolkata"
+                - start_time: "2026-02-01T17:00:00+05:30"
+                  end_time: "2026-02-01T19:00:00+05:30"
+                  timezone: "Asia/Kolkata"
       responses:
         '200':
           description: Availability submitted successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                success: true
+                data:
+                  message: "Availability submitted successfully"
         '400':
-          description: Invalid request body
+          description: Invalid request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Event or participant not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "BAD_REQUEST"
+                  message: "participant not found"
 
     put:
       tags:
         - Availability
       summary: Update availability
-      description: Update availability slots for a participant in an event
+      description: Updates participant's availability for an event
       operationId: updateAvailability
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
-        - name: user_id
-          in: path
-          required: true
-          description: User unique identifier
-          schema:
-            type: string
-            example: "usr_abc123"
+        - $ref: '#/components/parameters/EventIdParam'
+        - $ref: '#/components/parameters/UserIdPathParam'
       requestBody:
         required: true
         content:
@@ -520,15 +630,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                success: true
+                data:
+                  message: "Availability updated successfully"
         '400':
-          description: Invalid request body
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Event or participant not found
+          description: Invalid request
           content:
             application/json:
               schema:
@@ -537,83 +645,166 @@ paths:
     get:
       tags:
         - Availability
-      summary: Get availability
-      description: Get availability slots for a participant in an event
+      summary: Get participant availability
+      description: Retrieves participant's availability for an event
       operationId: getAvailability
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
-        - name: user_id
-          in: path
-          required: true
-          description: User unique identifier
-          schema:
-            type: string
-            example: "usr_abc123"
+        - $ref: '#/components/parameters/EventIdParam'
+        - $ref: '#/components/parameters/UserIdPathParam'
       responses:
         '200':
-          description: Availability slots retrieved
+          description: Participant availability
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/AvailabilityListResponse'
+              example:
+                success: true
+                data:
+                  - id: 1
+                    event_id: "evt_xyz789"
+                    user_id: "usr_def456"
+                    start_time: "2026-02-01T14:00:00+05:30"
+                    end_time: "2026-02-01T16:00:00+05:30"
+                    timezone: "Asia/Kolkata"
+                    created_at: "2026-02-18T12:00:00Z"
+                    updated_at: "2026-02-18T12:00:00Z"
+                  - id: 2
+                    event_id: "evt_xyz789"
+                    user_id: "usr_def456"
+                    start_time: "2026-02-01T17:00:00+05:30"
+                    end_time: "2026-02-01T19:00:00+05:30"
+                    timezone: "Asia/Kolkata"
+                    created_at: "2026-02-18T12:00:00Z"
+                    updated_at: "2026-02-18T12:00:00Z"
         '404':
-          description: Event or participant not found
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Availability
+      summary: Delete availability
+      description: Deletes participant's availability for an event
+      operationId: deleteAvailability
+      parameters:
+        - $ref: '#/components/parameters/EventIdParam'
+        - $ref: '#/components/parameters/UserIdPathParam'
+      responses:
+        '204':
+          description: Availability deleted successfully
+        '404':
+          description: Not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/events/{id}/recommendations:
-
     get:
       tags:
         - Recommendations
       summary: Get meeting slot recommendations
-      description: |
-        Generates recommended meeting time slots based on participant availability.
-        Returns slots ranked by suitability score considering how many participants are available.
+      description: Calculates and returns the best meeting slot recommendation based on participant availability
       operationId: getRecommendations
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: Event unique identifier
-          schema:
-            type: string
-            example: "evt_xyz789"
+        - $ref: '#/components/parameters/EventIdParam'
       responses:
         '200':
-          description: List of recommended meeting slots
+          description: Recommendation found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/RecommendationResponse'
+              example:
+                success: true
+                data:
+                  event_id: "evt_xyz789"
+                  duration_minutes: 60
+                  total_participants: 4
+                  best_recommendation:
+                    slot:
+                      start_time: "2026-02-01T15:00:00+05:30"
+                      end_time: "2026-02-01T16:00:00+05:30"
+                      timezone: "Asia/Kolkata"
+                    available_participants: 4
+                    availability_rate: 1.0
+                    available_users: ["usr_def456", "usr_ghi789", "usr_jkl012", "usr_mno345"]
+                    unavailable_users: []
+                  message: "Perfect match! All 4 participants are available for this time slot"
         '404':
           description: Event not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: No recommendations available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "BAD_REQUEST"
+                  message: "no overlapping availability found"
 
 components:
+  parameters:
+    UserIdParam:
+      name: id
+      in: path
+      required: true
+      description: User unique identifier
+      schema:
+        type: string
+        example: "usr_abc123"
+
+    UserIdPathParam:
+      name: user_id
+      in: path
+      required: true
+      description: User unique identifier
+      schema:
+        type: string
+        example: "usr_def456"
+
+    EventIdParam:
+      name: id
+      in: path
+      required: true
+      description: Event unique identifier
+      schema:
+        type: string
+        example: "evt_xyz789"
+
+    PageParam:
+      name: page
+      in: query
+      description: Page number (default 1)
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+      example: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Items per page (default 20, max 100)
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+      example: 20
 
   schemas:
-    SuccessResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: true
-        data:
-          type: object
-          description: Response data (varies by endpoint)
-
+    # Generic Response Schemas
     ErrorResponse:
       type: object
       properties:
@@ -621,17 +812,69 @@ components:
           type: boolean
           example: false
         error:
+          $ref: '#/components/schemas/Error'
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Error code
+          example: "NOT_FOUND"
+        message:
+          type: string
+          description: Error message
+          example: "Resource not found"
+
+    MessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
           type: object
           properties:
-            code:
-              type: string
-              description: Error code
-              example: "NOT_FOUND"
             message:
               type: string
-              description: Error message
-              example: "Resource not found"
+              example: "Operation completed successfully"
 
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 100
+
+    TimeSlot:
+      type: object
+      required:
+        - start_time
+        - end_time
+        - timezone
+      properties:
+        start_time:
+          type: string
+          format: date-time
+          description: Slot start time
+          example: "2026-02-20T09:00:00Z"
+        end_time:
+          type: string
+          format: date-time
+          description: Slot end time
+          example: "2026-02-20T10:00:00Z"
+        timezone:
+          type: string
+          description: Timezone
+          example: "UTC"
+
+    # User Schemas
     User:
       type: object
       properties:
@@ -652,12 +895,12 @@ components:
           type: string
           format: date-time
           description: User creation timestamp
-          example: "2026-01-01T00:00:00Z"
+          example: "2026-02-18T10:30:00Z"
         updated_at:
           type: string
           format: date-time
           description: User last update timestamp
-          example: "2026-01-01T00:00:00Z"
+          example: "2026-02-18T10:30:00Z"
 
     CreateUserRequest:
       type: object
@@ -686,7 +929,31 @@ components:
           type: string
           format: email
           description: User email address
+          example: "john.updated@example.com"
 
+    UserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/User'
+
+    UserListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # Event Schemas
     Event:
       type: object
       properties:
@@ -709,7 +976,7 @@ components:
         duration_minutes:
           type: integer
           description: Event duration in minutes
-          example: 30
+          example: 60
         status:
           type: string
           enum: [pending, confirmed, cancelled]
@@ -726,9 +993,11 @@ components:
         created_at:
           type: string
           format: date-time
+          example: "2026-02-18T10:30:00Z"
         updated_at:
           type: string
           format: date-time
+          example: "2026-02-18T10:30:00Z"
 
     ProposedSlot:
       type: object
@@ -736,26 +1005,29 @@ components:
         id:
           type: integer
           description: Slot ID
+          example: 1
         event_id:
           type: string
           description: Associated event ID
+          example: "evt_xyz789"
         start_time:
           type: string
           format: date-time
           description: Slot start time
-          example: "2026-02-20T09:00:00Z"
+          example: "2026-02-01T14:00:00+05:30"
         end_time:
           type: string
           format: date-time
           description: Slot end time
-          example: "2026-02-20T10:00:00Z"
+          example: "2026-02-01T16:00:00+05:30"
         timezone:
           type: string
           description: Timezone
-          example: "UTC"
+          example: "Asia/Kolkata"
         created_at:
           type: string
           format: date-time
+          example: "2026-02-18T10:30:00Z"
 
     CreateEventRequest:
       type: object
@@ -781,27 +1053,11 @@ components:
           minimum: 5
           maximum: 480
           description: Event duration in minutes
-          example: 30
+          example: 60
         proposed_slots:
           type: array
           items:
-            type: object
-            required:
-              - start_time
-              - end_time
-              - timezone
-            properties:
-              start_time:
-                type: string
-                format: date-time
-                example: "2026-02-20T09:00:00Z"
-              end_time:
-                type: string
-                format: date-time
-                example: "2026-02-20T10:00:00Z"
-              timezone:
-                type: string
-                example: "UTC"
+            $ref: '#/components/schemas/TimeSlot'
 
     UpdateEventRequest:
       type: object
@@ -809,14 +1065,26 @@ components:
         title:
           type: string
           description: Event title
+          example: "Weekly Team Sync - Updated"
         description:
           type: string
           description: Event description
+          example: "Updated meeting description"
         duration_minutes:
           type: integer
           minimum: 5
           maximum: 480
           description: Event duration in minutes
+          example: 45
+
+    EventResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Event'
 
     EventListResponse:
       type: object
@@ -829,33 +1097,27 @@ components:
           items:
             $ref: '#/components/schemas/Event'
         pagination:
-          type: object
-          properties:
-            page:
-              type: integer
-              example: 1
-            limit:
-              type: integer
-              example: 20
-            total:
-              type: integer
-              example: 100
+          $ref: '#/components/schemas/Pagination'
 
+    # Participant Schemas
     Participant:
       type: object
       properties:
         id:
           type: integer
           description: Unique participant record identifier
+          example: 1
         event_id:
           type: string
           description: Associated event ID
+          example: "evt_xyz789"
         user_id:
           type: string
           description: Associated user ID
+          example: "usr_def456"
         status:
           type: string
-          enum: [invited, accepted, declined]
+          enum: [invited, accepted, declined, responded]
           description: Participant's response status
           example: "invited"
         user:
@@ -863,52 +1125,107 @@ components:
         created_at:
           type: string
           format: date-time
+          example: "2026-02-18T10:35:00Z"
         updated_at:
           type: string
           format: date-time
+          example: "2026-02-18T10:35:00Z"
 
     AddParticipantRequest:
       type: object
       required:
-        - user_id
+        - user_ids
       properties:
-        user_id:
-          type: string
-          description: User ID to add as participant
-          example: "usr_abc123"
+        user_ids:
+          type: array
+          description: Array of User IDs to add as participants
+          items:
+            type: string
+          example: ["usr_def456", "usr_ghi789"]
 
+    AddParticipantResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Participants processed"
+            added_count:
+              type: integer
+              example: 2
+            failed_count:
+              type: integer
+              example: 0
+            added_user_ids:
+              type: array
+              items:
+                type: string
+              example: ["usr_def456", "usr_ghi789"]
+            failed_user_ids:
+              type: array
+              items:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                  error:
+                    type: string
+              example: []
+
+    ParticipantListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Participant'
+
+    # Availability Schemas
     AvailabilitySlot:
       type: object
       properties:
         id:
           type: integer
           description: Slot ID
+          example: 1
         event_id:
           type: string
           description: Associated event ID
+          example: "evt_xyz789"
         user_id:
           type: string
           description: Associated user ID
+          example: "usr_def456"
         start_time:
           type: string
           format: date-time
           description: Availability start time
-          example: "2026-02-20T09:00:00Z"
+          example: "2026-02-01T14:00:00+05:30"
         end_time:
           type: string
           format: date-time
           description: Availability end time
-          example: "2026-02-20T10:00:00Z"
+          example: "2026-02-01T16:00:00+05:30"
         timezone:
           type: string
           description: Timezone
-          example: "UTC"
+          example: "Asia/Kolkata"
         created_at:
           type: string
           format: date-time
+          example: "2026-02-18T12:00:00Z"
         updated_at:
           type: string
           format: date-time
+          example: "2026-02-18T12:00:00Z"
 
     AvailabilityRequest:
       type: object
@@ -918,27 +1235,20 @@ components:
         available_slots:
           type: array
           items:
-            type: object
-            required:
-              - start_time
-              - end_time
-              - timezone
-            properties:
-              start_time:
-                type: string
-                format: date-time
-                description: Availability start time
-                example: "2026-02-20T09:00:00Z"
-              end_time:
-                type: string
-                format: date-time
-                description: Availability end time
-                example: "2026-02-20T10:00:00Z"
-              timezone:
-                type: string
-                description: Timezone
-                example: "UTC"
+            $ref: '#/components/schemas/TimeSlot'
 
+    AvailabilityListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AvailabilitySlot'
+
+    # Recommendation Schemas
     RecommendationResponse:
       type: object
       properties:
@@ -971,22 +1281,7 @@ components:
       type: object
       properties:
         slot:
-          type: object
-          properties:
-            start_time:
-              type: string
-              format: date-time
-              description: Recommended slot start time
-              example: "2026-02-20T14:00:00Z"
-            end_time:
-              type: string
-              format: date-time
-              description: Recommended slot end time
-              example: "2026-02-20T15:00:00Z"
-            timezone:
-              type: string
-              description: Timezone
-              example: "UTC"
+          $ref: '#/components/schemas/TimeSlot'
         available_participants:
           type: integer
           description: Number of participants available
@@ -1001,11 +1296,10 @@ components:
           items:
             type: string
           description: List of available user IDs
-          example: ["usr_abc123", "usr_def456"]
+          example: ["usr_def456", "usr_ghi789", "usr_jkl012", "usr_mno345"]
         unavailable_users:
           type: array
           items:
             type: string
           description: List of unavailable user IDs
           example: []
-

@@ -23,8 +23,13 @@ rds_username       = "admin"
 # Note: rds_password should be provided via environment variable TF_VAR_rds_password
 # or via a secure secrets file that is NOT committed to version control
 
-# API Gateway Configuration
-api_gateway_stage = "v1"
-
 # Application Configuration
 app_port = 8080
+
+# Auto Scaling Configuration
+asg_min_size         = 1
+asg_max_size         = 4
+asg_desired_capacity = 2
+
+# CloudWatch Configuration
+cloudwatch_log_retention_days = 7

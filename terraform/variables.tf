@@ -87,16 +87,35 @@ variable "db_engine_version" {
   default     = "8.0"
 }
 
-# API Gateway Variables
-variable "api_stage_name" {
-  description = "API Gateway stage name"
-  type        = string
-  default     = "v1"
-}
-
 # Application Variables
 variable "app_port" {
   description = "Port the application runs on"
   type        = number
   default     = 8080
+}
+
+# Auto Scaling Group Variables
+variable "asg_min_size" {
+  description = "Minimum number of instances in Auto Scaling Group"
+  type        = number
+  default     = 1
+}
+
+variable "asg_max_size" {
+  description = "Maximum number of instances in Auto Scaling Group"
+  type        = number
+  default     = 4
+}
+
+variable "asg_desired_capacity" {
+  description = "Desired number of instances in Auto Scaling Group"
+  type        = number
+  default     = 2
+}
+
+# CloudWatch Variables
+variable "cloudwatch_log_retention_days" {
+  description = "Number of days to retain CloudWatch logs"
+  type        = number
+  default     = 7
 }

@@ -15,7 +15,7 @@ dnf update -y
 
 # Install required packages
 echo "Installing required packages..."
-dnf install -y golang git jq
+dnf install -y golang git jq amazon-cloudwatch-agent
 
 # Create application user
 echo "Creating application user..."
@@ -37,6 +37,119 @@ EOF
 
 chown appuser:appuser /opt/meeting-slot-service/.env
 
+# Configure CloudWatch Agent
+echo "Configuring CloudWatch Agent..."
+cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json << 'CW_EOF'
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "root"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/meeting-slot-service/app.log",
+            "log_group_name": "/aws/ec2/${name_prefix}/application",
+            "log_stream_name": "{instance_id}",
+            "retention_in_days": 7,
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/meeting-slot-service/error.log",
+            "log_group_name": "/aws/ec2/${name_prefix}/error",
+            "log_stream_name": "{instance_id}",
+            "retention_in_days": 7,
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/messages",
+            "log_group_name": "/aws/ec2/${name_prefix}/system",
+            "log_stream_name": "{instance_id}",
+            "retention_in_days": 7,
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/user-data.log",
+            "log_group_name": "/aws/ec2/${name_prefix}/system",
+            "log_stream_name": "{instance_id}-user-data",
+            "retention_in_days": 7,
+            "timezone": "UTC"
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "namespace": "${name_prefix}/Application",
+    "metrics_collected": {
+      "cpu": {
+        "measurement": [
+          {
+            "name": "cpu_usage_idle",
+            "rename": "CPU_IDLE",
+            "unit": "Percent"
+          },
+          {
+            "name": "cpu_usage_iowait",
+            "rename": "CPU_IOWAIT",
+            "unit": "Percent"
+          }
+        ],
+        "metrics_collection_interval": 60,
+        "totalcpu": false
+      },
+      "disk": {
+        "measurement": [
+          {
+            "name": "used_percent",
+            "rename": "DISK_USED",
+            "unit": "Percent"
+          }
+        ],
+        "metrics_collection_interval": 60,
+        "resources": [
+          "*"
+        ]
+      },
+      "mem": {
+        "measurement": [
+          {
+            "name": "mem_used_percent",
+            "rename": "MEM_USED",
+            "unit": "Percent"
+          }
+        ],
+        "metrics_collection_interval": 60
+      },
+      "netstat": {
+        "measurement": [
+          {
+            "name": "tcp_established",
+            "rename": "TCP_ESTABLISHED",
+            "unit": "Count"
+          }
+        ],
+        "metrics_collection_interval": 60
+      }
+    }
+  }
+}
+CW_EOF
+
+# Create log directory for application
+mkdir -p /var/log/meeting-slot-service
+chown appuser:appuser /var/log/meeting-slot-service
+
+# Start CloudWatch Agent
+echo "Starting CloudWatch Agent..."
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+
 # Create systemd service
 echo "Creating systemd service..."
 cat > /etc/systemd/system/meeting-slot-service.service << 'EOF'
@@ -53,8 +166,8 @@ EnvironmentFile=/opt/meeting-slot-service/.env
 ExecStart=/opt/meeting-slot-service/server
 Restart=always
 RestartSec=5
-StandardOutput=journal
-StandardError=journal
+StandardOutput=append:/var/log/meeting-slot-service/app.log
+StandardError=append:/var/log/meeting-slot-service/error.log
 
 [Install]
 WantedBy=multi-user.target

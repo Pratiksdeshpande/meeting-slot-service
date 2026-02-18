@@ -17,21 +17,54 @@ In distributed teams across multiple timezones, finding a common meeting time is
 - **Smart Recommendations**: Algorithm finds best meeting times considering all constraints
 - **Timezone Support**: Built-in handling of multiple timezones
 - **RESTful API**: Clean, well-documented REST endpoints
-- **AWS Native**: Deployed on AWS with EC2, RDS, and API Gateway
+- **AWS Native**: Deployed on AWS with ALB, Auto Scaling, RDS, and CloudWatch
+- **Horizontal Scalability**: Auto-scaling group handles variable load
+- **Production Monitoring**: CloudWatch logs, metrics, and dashboards
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   AWS API       │────▶│     EC2         │────▶│    AWS RDS      │
-│   Gateway       │     │  (Go Service)   │     │    (MySQL)      │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │
-                               ▼
-                        ┌─────────────────┐
-                        │ AWS Secrets     │
-                        │ Manager         │
-                        └─────────────────┘
+                    ┌─────────────────────────────────────┐
+                    │         Internet Traffic            │
+                    └──────────────┬──────────────────────┘
+                                   │
+                                   ▼
+                    ┌─────────────────────────────────────┐
+                    │   Application Load Balancer (ALB)   │
+                    │  • HTTP/HTTPS Load Distribution     │
+                    │  • Health Checks                    │
+                    └──────────────┬──────────────────────┘
+                                   │
+        ┌──────────────────────────┼──────────────────────────┐
+        │                          │                          │
+        ▼                          ▼                          ▼
+┌───────────────┐        ┌───────────────┐        ┌───────────────┐
+│  EC2 Instance │        │  EC2 Instance │        │  EC2 Instance │
+│  (Go Service) │        │  (Go Service) │        │  (Go Service) │
+│               │        │               │        │               │
+└───────┬───────┘        └───────┬───────┘        └───────┬───────┘
+        │                        │                        │
+        └────────────────────────┼────────────────────────┘
+                                 │
+                 ┌───────────────┴───────────────┐
+                 │                               │
+                 ▼                               ▼
+      ┌─────────────────┐            ┌─────────────────┐
+      │    AWS RDS      │            │  AWS Secrets    │
+      │    (MySQL)      │            │  Manager        │
+      │  • Multi-AZ     │            │                 │
+      └─────────────────┘            └─────────────────┘
+                 │
+                 ▼
+      ┌─────────────────┐
+      │  CloudWatch     │
+      │  • Logs         │
+      │  • Metrics      │
+      │  • Dashboards   │
+      │  • Alarms       │
+      └─────────────────┘
+
+Auto Scaling Group: 1-4 instances based on CPU utilization
 ```
 
 ## 🚀 Quick Start
@@ -361,28 +394,49 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for system architecture and design deci
 
 ## 🛠️ Technology Stack
 
-- **Language**: Go 1.25+
+- **Language**: Go 1.24+
 - **Web Framework**: Gorilla Mux
-- **Database**: AWS RDS MySQL
+- **Database**: AWS RDS MySQL 8.0
 - **Database Access**: AWS SDK for Go v2, database/sql
 - **Configuration**: Environment variables + AWS Secrets Manager
-- **Infrastructure**: Terraform
-- **Cloud**: AWS (EC2, RDS, API Gateway, Secrets Manager, VPC)
-- **Testing**: testify, httptest
+- **Infrastructure**: Terraform (AWS provider ~> 5.0)
+- **Cloud**: AWS
+  - **Compute**: EC2 (Auto Scaling Group with 1-4 instances)
+  - **Load Balancing**: Application Load Balancer
+  - **Database**: RDS MySQL (Multi-AZ)
+  - **Monitoring**: CloudWatch (Logs, Metrics, Dashboards, Alarms)
+  - **Security**: Secrets Manager, IAM roles, VPC
+- **Testing**: testify, httptest, go-sqlmock
 
 ## ☁️ AWS Infrastructure
 
-The Terraform configuration provisions:
+The Terraform configuration provisions a production-ready, horizontally scalable infrastructure:
 
 | Resource | Description |
 |----------|-------------|
-| **VPC** | Isolated network with public/private subnets |
-| **EC2** | Application server running the Go service |
-| **RDS MySQL** | Managed database in private subnet |
-| **API Gateway** | Public REST API endpoint with CORS |
+| **Application Load Balancer** | Distributes traffic across EC2 instances with health checks |
+| **Auto Scaling Group** | 1-4 EC2 instances, scales based on CPU utilization |
+| **Launch Template** | Standardized EC2 configuration with CloudWatch agent |
+| **VPC** | Isolated network with 2 public + 2 private subnets across 2 AZs |
+| **RDS MySQL** | Managed database in private subnet with Multi-AZ support |
+| **CloudWatch** | Centralized logging, metrics, dashboards, and alarms |
 | **Secrets Manager** | Database credential storage |
-| **IAM** | Roles and policies for EC2 |
+| **IAM** | Roles and policies for EC2 (Secrets Manager, CloudWatch, RDS access) |
 | **NAT Gateway** | Outbound internet for private subnets |
+| **S3** | ALB access logs storage with lifecycle policies |
+
+### Scalability Features
+- **Auto-Scaling Policies**: Scale up at >70% CPU, scale down at <20% CPU
+- **Target Tracking**: Maintain 50% average CPU utilization
+- **Health Checks**: ALB performs health checks every 30s on `/health` endpoint
+- **Zero-Downtime Deployments**: Rolling instance refresh with 50% min healthy
+
+### Monitoring & Observability
+- **Application Logs**: `/aws/ec2/{env}/application` - Application output
+- **Error Logs**: `/aws/ec2/{env}/error` - Error tracking
+- **System Logs**: `/aws/ec2/{env}/system` - OS-level logs
+- **Metrics Dashboard**: ALB, EC2, and RDS performance metrics
+- **Alarms**: CPU utilization (high/low), error rate threshold
 
 ### Environment Variables
 
@@ -406,16 +460,23 @@ The Terraform configuration provisions:
 Completed:
 - ✅ Project setup and configuration
 - ✅ Database models and migrations (MySQL)
-- ✅ Repository layer with AWS SDK
+- ✅ Repository layer with AWS SDK (89.4% test coverage)
 - ✅ Service layer with business logic
 - ✅ **Core recommendation algorithm**
 - ✅ HTTP handlers with Gorilla Mux
 - ✅ Middleware (CORS, logging, recovery)
-- ✅ Unit tests for critical components
+- ✅ Unit tests with mocking (testify, go-sqlmock)
 - ✅ RESTful API with all CRUD operations
-- ✅ **Terraform infrastructure (VPC, EC2, RDS, API Gateway)**
+- ✅ **Production-ready Terraform infrastructure**
+  - Application Load Balancer
+  - Auto Scaling Group (1-4 instances)
+  - CloudWatch logging and monitoring
+  - Multi-AZ RDS MySQL
+  - VPC with public/private subnets
 - ✅ **AWS Secrets Manager integration**
 - ✅ **Swagger/OpenAPI documentation**
+- ✅ **Horizontal scalability with auto-scaling policies**
+- ✅ **CloudWatch dashboards and alarms**
 
 Pending:
 - ⏳ GitLab CI/CD pipeline setup
@@ -458,21 +519,53 @@ cp terraform.tfvars.example terraform.tfvars
 vim terraform.tfvars  # Edit with your values
 
 # Set RDS password securely
-export TF_VAR_rds_password="your-secure-password"
+export TF_VAR_db_password="your-secure-password"
 
 # Deploy infrastructure
 terraform init
 terraform plan
 terraform apply
 
-# Get API Gateway URL
-terraform output api_gateway_url
+# Get Application Load Balancer URL
+terraform output alb_url
+terraform output deployment_summary  # Full deployment details
 ```
 
 ### Post-Deployment
-1. Deploy your Go binary to EC2 via the deployment script
-2. Verify health check: `curl <api_gateway_url>/health`
-3. Access CloudWatch for API Gateway logs
+1. The Auto Scaling Group automatically launches EC2 instances with your application
+2. Verify health check: `curl <alb_url>/health`
+3. Monitor via CloudWatch:
+   - Dashboard: Available in Terraform outputs
+   - Logs: Application, error, and system logs
+   - Metrics: ALB, EC2, and RDS performance
+4. Test scaling: Watch instances scale up/down based on load
+
+### Accessing the Application
+```bash
+# Get the ALB URL
+ALB_URL=$(terraform output -raw alb_url)
+
+# Health check
+curl $ALB_URL/health
+
+# Create a user
+curl -X POST $ALB_URL/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Doe","email":"john@example.com"}'
+```
+
+### Monitoring
+```bash
+# View CloudWatch Dashboard URL
+terraform output cloudwatch_dashboard_url
+
+# Check Auto Scaling Group status
+aws autoscaling describe-auto-scaling-groups \
+  --auto-scaling-group-names $(terraform output -raw asg_name)
+
+# View recent application logs
+aws logs tail /aws/ec2/dev/application --follow
+```
 
 ## 📖 Documentation
 
@@ -526,14 +619,17 @@ meeting-slot-service/
 │   ├── main.tf                  # Provider and locals
 │   ├── variables.tf             # Input variables
 │   ├── outputs.tf               # Output values
-│   ├── vpc.tf                   # VPC and networking
-│   ├── security_groups.tf       # Security groups
+│   ├── vpc.tf                   # VPC and networking (2 AZs)
+│   ├── security_groups.tf       # Security groups (ALB, EC2, RDS)
+│   ├── alb.tf                   # Application Load Balancer
+│   ├── autoscaling.tf           # Launch Template + Auto Scaling Group
+│   ├── ec2.tf                   # IAM roles and instance profile
 │   ├── rds.tf                   # RDS MySQL + Secrets Manager
-│   ├── ec2.tf                   # EC2 instance + IAM
-│   ├── api_gateway.tf           # API Gateway REST API
+│   ├── cloudwatch.tf            # Logs, metrics, dashboard, alarms
 │   ├── terraform.tfvars.example # Variable template
+│   ├── README.md                # Detailed infrastructure documentation
 │   └── templates/
-│       └── user_data.sh         # EC2 bootstrap script
+│       └── user_data.sh         # EC2 bootstrap script with CloudWatch agent
 ├── go.mod                       # Go dependencies
 ├── Makefile                     # Build automation
 ├── ARCHITECTURE.md              # Architecture documentation

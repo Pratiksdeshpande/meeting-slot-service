@@ -16,20 +16,51 @@ output "private_subnet_ids" {
   value       = aws_subnet.private[*].id
 }
 
-# EC2 Outputs
-output "ec2_instance_id" {
-  description = "EC2 instance ID"
-  value       = aws_instance.api_server.id
+# ALB Outputs
+output "alb_dns_name" {
+  description = "DNS name of the Application Load Balancer"
+  value       = aws_lb.main.dns_name
 }
 
-output "ec2_public_ip" {
-  description = "EC2 public IP (Elastic IP)"
-  value       = aws_eip.api_server.public_ip
+output "alb_zone_id" {
+  description = "Zone ID of the Application Load Balancer"
+  value       = aws_lb.main.zone_id
 }
 
-output "ec2_private_ip" {
-  description = "EC2 private IP"
-  value       = aws_instance.api_server.private_ip
+output "alb_arn" {
+  description = "ARN of the Application Load Balancer"
+  value       = aws_lb.main.arn
+}
+
+output "alb_url" {
+  description = "HTTP URL of the Application Load Balancer"
+  value       = "http://${aws_lb.main.dns_name}"
+}
+
+# Auto Scaling Group Outputs
+output "asg_name" {
+  description = "Name of the Auto Scaling Group"
+  value       = aws_autoscaling_group.app.name
+}
+
+output "asg_arn" {
+  description = "ARN of the Auto Scaling Group"
+  value       = aws_autoscaling_group.app.arn
+}
+
+output "asg_min_size" {
+  description = "Minimum size of the Auto Scaling Group"
+  value       = aws_autoscaling_group.app.min_size
+}
+
+output "asg_max_size" {
+  description = "Maximum size of the Auto Scaling Group"
+  value       = aws_autoscaling_group.app.max_size
+}
+
+output "asg_desired_capacity" {
+  description = "Desired capacity of the Auto Scaling Group"
+  value       = aws_autoscaling_group.app.desired_capacity
 }
 
 # RDS Outputs
@@ -53,29 +84,77 @@ output "db_credentials_secret_arn" {
   value       = aws_secretsmanager_secret.db_credentials.arn
 }
 
-# API Gateway Outputs
-output "api_gateway_id" {
-  description = "API Gateway REST API ID"
-  value       = aws_api_gateway_rest_api.main.id
+# CloudWatch Outputs
+output "cloudwatch_log_groups" {
+  description = "CloudWatch log group names"
+  value = {
+    application = aws_cloudwatch_log_group.application.name
+    system      = aws_cloudwatch_log_group.system.name
+    access      = aws_cloudwatch_log_group.access.name
+    error       = aws_cloudwatch_log_group.error.name
+  }
 }
 
-output "api_gateway_url" {
-  description = "API Gateway invoke URL"
-  value       = aws_api_gateway_stage.main.invoke_url
-}
-
-output "api_gateway_stage" {
-  description = "API Gateway stage name"
-  value       = aws_api_gateway_stage.main.stage_name
+output "cloudwatch_dashboard_url" {
+  description = "URL to CloudWatch Dashboard"
+  value       = "https://console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards:name=${aws_cloudwatch_dashboard.main.dashboard_name}"
 }
 
 # Connection Information
 output "connection_info" {
   description = "Connection information for the service"
   value = {
-    api_url         = aws_api_gateway_stage.main.invoke_url
-    ec2_direct_url  = "http://${aws_eip.api_server.public_ip}:${var.app_port}"
-    health_check    = "${aws_api_gateway_stage.main.invoke_url}/health"
-    ssh_command     = var.ec2_key_name != "" ? "ssh -i ${var.ec2_key_name}.pem ec2-user@${aws_eip.api_server.public_ip}" : "Use SSM Session Manager"
+    # Primary access method
+    application_url     = "http://${aws_lb.main.dns_name}"
+    health_check_url    = "http://${aws_lb.main.dns_name}/health"
+    
+    # Monitoring
+    cloudwatch_dashboard = "https://console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards:name=${aws_cloudwatch_dashboard.main.dashboard_name}"
+    
+    # Database
+    database_endpoint   = aws_db_instance.main.endpoint
+    db_secret_arn       = aws_secretsmanager_secret.db_credentials.arn
+    
+    # Infrastructure
+    asg_name            = aws_autoscaling_group.app.name
+    min_instances       = aws_autoscaling_group.app.min_size
+    max_instances       = aws_autoscaling_group.app.max_size
   }
+}
+
+# Summary Output
+output "deployment_summary" {
+  description = "Summary of deployed resources"
+  value = <<-EOT
+    
+    ========================================
+    Meeting Slot Service - Deployment Summary
+    ========================================
+    
+    Environment: ${var.environment}
+    Region: ${var.aws_region}
+    
+    APPLICATION ACCESS:
+    - Load Balancer URL: http://${aws_lb.main.dns_name}
+    - Health Check: http://${aws_lb.main.dns_name}/health
+    
+    AUTO SCALING:
+    - Min Instances: ${aws_autoscaling_group.app.min_size}
+    - Max Instances: ${aws_autoscaling_group.app.max_size}
+    - Desired: ${aws_autoscaling_group.app.desired_capacity}
+    
+    DATABASE:
+    - RDS Endpoint: ${aws_db_instance.main.endpoint}
+    - DB Name: ${aws_db_instance.main.db_name}
+    - Credentials: Stored in AWS Secrets Manager
+    
+    MONITORING:
+    - CloudWatch Dashboard: https://console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards:name=${aws_cloudwatch_dashboard.main.dashboard_name}
+    - Log Groups: 
+      * Application: ${aws_cloudwatch_log_group.application.name}
+      * Errors: ${aws_cloudwatch_log_group.error.name}
+      * System: ${aws_cloudwatch_log_group.system.name}
+    
+    ========================================
+  EOT
 }

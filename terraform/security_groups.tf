@@ -1,18 +1,56 @@
 # Security Groups
 
+# Application Load Balancer Security Group
+resource "aws_security_group" "alb" {
+  name        = "${local.name_prefix}-alb-sg"
+  description = "Security group for Application Load Balancer"
+  vpc_id      = aws_vpc.main.id
+
+  # HTTP from internet
+  ingress {
+    description = "HTTP from internet"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # HTTPS from internet (for future SSL termination)
+  ingress {
+    description = "HTTPS from internet"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # All outbound traffic
+  egress {
+    description = "All outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-alb-sg"
+  }
+}
+
 # EC2 Security Group
 resource "aws_security_group" "ec2" {
   name        = "${local.name_prefix}-ec2-sg"
   description = "Security group for EC2 API server"
   vpc_id      = aws_vpc.main.id
 
-  # HTTP from API Gateway VPC Link / ALB
+  # HTTP from ALB only
   ingress {
-    description = "HTTP from anywhere (via API Gateway)"
-    from_port   = var.app_port
-    to_port     = var.app_port
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "HTTP from ALB"
+    from_port       = var.app_port
+    to_port         = var.app_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
   }
 
   # SSH access (optional - for debugging)

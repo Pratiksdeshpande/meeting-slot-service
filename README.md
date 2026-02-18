@@ -342,7 +342,6 @@ The **Slot Matching Algorithm** lives in `internal/service/recommendation_servic
 | [ARCHITECTURE.md](./ARCHITECTURE.md)         | System architecture, data flow, component design |
 | [TEST-APIs.md](TEST-APIs.md)                 | Step-by-step API testing guide                   |
 | [docs/swagger.yaml](./docs/swagger.yaml)     | OpenAPI specification                            |
-| [terraform/README.md](./terraform/README.md) | Infrastructure documentation                     |
 
 ---
 

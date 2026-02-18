@@ -31,50 +31,35 @@ func NormalizeToUTC(t time.Time) time.Time {
 	return t.UTC()
 }
 
-// ParseTimeWithZone parses a time string with a specific timezone
-func ParseTimeWithZone(timeStr, timezone string) (time.Time, error) {
-	loc, err := time.LoadLocation(timezone)
-	if err != nil {
-		return time.Time{}, err
-	}
-	
-	t, err := time.Parse(time.RFC3339, timeStr)
-	if err != nil {
-		return time.Time{}, err
-	}
-	
-	return t.In(loc), nil
-}
-
 // GenerateCandidateSlots generates candidate time slots within a window
 // using a sliding window approach with the specified interval
 func GenerateCandidateSlots(window TimeSlot, durationMinutes int, intervalMinutes int) []TimeSlot {
 	var candidates []TimeSlot
 	duration := time.Duration(durationMinutes) * time.Minute
 	interval := time.Duration(intervalMinutes) * time.Minute
-	
+
 	currentStart := window.Start
 	for {
 		candidateEnd := currentStart.Add(duration)
-		
+
 		// Check if candidate slot fits within the window
 		if candidateEnd.After(window.End) {
 			break
 		}
-		
+
 		candidates = append(candidates, TimeSlot{
 			Start: currentStart,
 			End:   candidateEnd,
 		})
-		
+
 		// Move to next interval
 		currentStart = currentStart.Add(interval)
-		
+
 		// Prevent infinite loop
 		if currentStart.After(window.End) || currentStart.Equal(window.End) {
 			break
 		}
 	}
-	
+
 	return candidates
 }

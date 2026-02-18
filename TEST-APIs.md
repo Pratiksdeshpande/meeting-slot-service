@@ -239,30 +239,22 @@ Sarah creates the "Brainstorming Meeting" event with 3 proposed time slots.
     "status": "pending",
     "proposed_slots": [
       {
-        "id": 1,
-        "event_id": "evt_xxxxxxxxxxxx",
         "start_time": "2026-01-15T22:00:00Z",
         "end_time": "2026-01-16T01:00:00Z",
-        "timezone": "America/Los_Angeles",
-        "created_at": "2026-01-14T10:05:00Z"
+        "timezone": "America/Los_Angeles"
       },
       {
-        "id": 2,
-        "event_id": "evt_xxxxxxxxxxxx",
         "start_time": "2026-01-16T16:00:00Z",
         "end_time": "2026-01-16T19:00:00Z",
-        "timezone": "America/Los_Angeles",
-        "created_at": "2026-01-14T10:05:00Z"
+        "timezone": "America/Los_Angeles"
       },
       {
-        "id": 3,
-        "event_id": "evt_xxxxxxxxxxxx",
         "start_time": "2026-01-18T02:00:00Z",
         "end_time": "2026-01-18T05:00:00Z",
-        "timezone": "America/Los_Angeles",
-        "created_at": "2026-01-14T10:05:00Z"
+        "timezone": "America/Los_Angeles"
       }
     ],
+    "participants": [],
     "created_at": "2026-01-14T10:05:00Z",
     "updated_at": "2026-01-14T10:05:00Z"
   }
@@ -491,11 +483,76 @@ The system returns the best recommendation based on maximum availability.
 
 **No request body required**
 
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "evt_xxxxxxxxxxxx",
+    "title": "Q1 Brainstorming Meeting",
+    "description": "Strategic planning session for Q1 initiatives.",
+    "organizer_id": "<SARAH_USER_ID>",
+    "duration_minutes": 90,
+    "status": "pending",
+    "proposed_slots": [
+      {
+        "start_time": "2026-01-15T22:00:00Z",
+        "end_time": "2026-01-16T01:00:00Z",
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "participants": [
+      {
+        "status": "responded",
+        "user": {
+          "id": "<SARAH_USER_ID>",
+          "name": "Sarah Johnson",
+          "email": "sarah.johnson@company.com",
+          "created_at": "2026-01-14T10:00:00Z",
+          "updated_at": "2026-01-14T10:00:00Z"
+        }
+      }
+    ],
+    "created_at": "2026-01-14T10:05:00Z",
+    "updated_at": "2026-01-14T10:05:00Z"
+  }
+}
+```
+
 ### List All Participants
 
 **Endpoint:** `GET /api/v1/events/<EVENT_ID>/participants`
 
 **No request body required**
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "status": "responded",
+      "user": {
+        "id": "<SARAH_USER_ID>",
+        "name": "Sarah Johnson",
+        "email": "sarah.johnson@company.com",
+        "created_at": "2026-01-14T10:00:00Z",
+        "updated_at": "2026-01-14T10:00:00Z"
+      }
+    },
+    {
+      "status": "responded",
+      "user": {
+        "id": "<RAJ_USER_ID>",
+        "name": "Raj Kumar",
+        "email": "raj.kumar@company.com",
+        "created_at": "2026-01-14T10:01:00Z",
+        "updated_at": "2026-01-14T10:01:00Z"
+      }
+    }
+  ]
+}
+```
 
 ### Get Participant's Availability
 

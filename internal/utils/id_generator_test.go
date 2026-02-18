@@ -10,7 +10,7 @@ func TestGenerateEventID(t *testing.T) {
 	id := GenerateEventID()
 
 	// Should start with evt_
-	assert.Contains(t, id, "evt_")
+	assert.Contains(t, id, EventIDPrefix)
 	assert.Greater(t, len(id), 10)
 }
 
@@ -18,12 +18,12 @@ func TestGenerateUserID(t *testing.T) {
 	id := GenerateUserID()
 
 	// Should start with usr_
-	assert.Contains(t, id, "usr_")
+	assert.Contains(t, id, UserIDPrefix)
 	assert.Greater(t, len(id), 10)
 }
 
 func TestGenerateUUID(t *testing.T) {
-	id := GenerateUUID()
+	id := generateUUID()
 
 	// Should be a valid UUID format
 	assert.Equal(t, 36, len(id)) // UUIDs are 36 characters with dashes

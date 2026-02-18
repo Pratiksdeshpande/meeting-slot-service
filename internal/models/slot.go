@@ -6,12 +6,12 @@ import (
 
 // ProposedSlot represents a time slot proposed by the organizer
 type ProposedSlot struct {
-	ID        uint      `json:"id"`
-	EventID   string    `json:"event_id"`
+	ID        uint      `json:"-"`
+	EventID   string    `json:"-"`
 	StartTime time.Time `json:"start_time" validate:"required"`
 	EndTime   time.Time `json:"end_time" validate:"required,gtfield=StartTime"`
 	Timezone  string    `json:"timezone" validate:"required"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time `json:"-"`
 }
 
 // AvailabilitySlot represents a participant's available time slot

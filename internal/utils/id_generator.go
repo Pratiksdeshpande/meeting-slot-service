@@ -2,26 +2,32 @@ package utils
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"strings"
+
+	"github.com/google/uuid"
+)
+
+const (
+	EventIDPrefix = "evt_"
+	UserIDPrefix  = "usr_"
 )
 
 // GenerateEventID generates a unique event ID with 'evt_' prefix
 func GenerateEventID() string {
-	id := uuid.New().String()
+	id := generateUUID()
 	// Take first 12 characters for shorter IDs
 	shortID := strings.ReplaceAll(id[:13], "-", "")
-	return fmt.Sprintf("evt_%s", shortID)
+	return fmt.Sprintf("%s%s", EventIDPrefix, shortID)
 }
 
 // GenerateUserID generates a unique user ID with 'usr_' prefix
 func GenerateUserID() string {
-	id := uuid.New().String()
+	id := generateUUID()
 	shortID := strings.ReplaceAll(id[:13], "-", "")
-	return fmt.Sprintf("usr_%s", shortID)
+	return fmt.Sprintf("%s%s", UserIDPrefix, shortID)
 }
 
-// GenerateUUID generates a standard UUID
-func GenerateUUID() string {
+// generateUUID generates a standard UUID
+func generateUUID() string {
 	return uuid.New().String()
 }

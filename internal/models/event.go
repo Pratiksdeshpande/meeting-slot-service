@@ -20,11 +20,9 @@ type Event struct {
 	DeletedAt       sql.NullTime       `json:"-"`
 }
 
-// EventStatus constants
+// EventStatusPending EventStatus constants
 const (
-	EventStatusPending   = "pending"
-	EventStatusScheduled = "scheduled"
-	EventStatusCancelled = "cancelled"
+	EventStatusPending = "pending"
 )
 
 // EventFilter represents filters for querying events

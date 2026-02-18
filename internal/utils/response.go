@@ -86,7 +86,3 @@ func WriteNotFound(w http.ResponseWriter, message string) {
 func WriteInternalError(w http.ResponseWriter, message string) {
 	WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", message)
 }
-
-func WriteConflict(w http.ResponseWriter, message string) {
-	WriteError(w, http.StatusConflict, "CONFLICT", message)
-}

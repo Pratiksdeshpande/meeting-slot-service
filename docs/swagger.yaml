@@ -270,18 +270,12 @@ paths:
                   duration_minutes: 60
                   status: "pending"
                   proposed_slots:
-                    - id: 1
-                      event_id: "evt_xyz789"
-                      start_time: "2026-02-01T14:00:00+05:30"
+                    - start_time: "2026-02-01T14:00:00+05:30"
                       end_time: "2026-02-01T16:00:00+05:30"
                       timezone: "Asia/Kolkata"
-                      created_at: "2026-02-18T10:30:00Z"
-                    - id: 2
-                      event_id: "evt_xyz789"
-                      start_time: "2026-02-01T17:00:00+05:30"
+                    - start_time: "2026-02-01T17:00:00+05:30"
                       end_time: "2026-02-01T19:00:00+05:30"
                       timezone: "Asia/Kolkata"
-                      created_at: "2026-02-18T10:30:00Z"
                   participants: []
                   created_at: "2026-02-18T10:30:00Z"
                   updated_at: "2026-02-18T10:30:00Z"
@@ -365,19 +359,11 @@ paths:
                   duration_minutes: 60
                   status: "pending"
                   proposed_slots:
-                    - id: 1
-                      event_id: "evt_xyz789"
-                      start_time: "2026-02-01T14:00:00+05:30"
+                    - start_time: "2026-02-01T14:00:00+05:30"
                       end_time: "2026-02-01T16:00:00+05:30"
                       timezone: "Asia/Kolkata"
-                      created_at: "2026-02-18T10:30:00Z"
                   participants:
-                    - id: 1
-                      event_id: "evt_xyz789"
-                      user_id: "usr_def456"
-                      status: "invited"
-                      created_at: "2026-02-18T10:35:00Z"
-                      updated_at: "2026-02-18T10:35:00Z"
+                    - status: "invited"
                       user:
                         id: "usr_def456"
                         name: "Jane Smith"
@@ -511,24 +497,14 @@ paths:
               example:
                 success: true
                 data:
-                  - id: 1
-                    event_id: "evt_xyz789"
-                    user_id: "usr_def456"
-                    status: "invited"
-                    created_at: "2026-02-18T10:35:00Z"
-                    updated_at: "2026-02-18T10:35:00Z"
+                  - status: "invited"
                     user:
                       id: "usr_def456"
                       name: "Jane Smith"
                       email: "jane.smith@example.com"
                       created_at: "2026-02-18T11:00:00Z"
                       updated_at: "2026-02-18T11:00:00Z"
-                  - id: 2
-                    event_id: "evt_xyz789"
-                    user_id: "usr_ghi789"
-                    status: "accepted"
-                    created_at: "2026-02-18T10:35:00Z"
-                    updated_at: "2026-02-18T12:00:00Z"
+                  - status: "accepted"
                     user:
                       id: "usr_ghi789"
                       name: "Bob Johnson"
@@ -1001,15 +977,8 @@ components:
 
     ProposedSlot:
       type: object
+      description: A proposed time slot for an event (id, event_id, created_at are internal fields not exposed in API)
       properties:
-        id:
-          type: integer
-          description: Slot ID
-          example: 1
-        event_id:
-          type: string
-          description: Associated event ID
-          example: "evt_xyz789"
         start_time:
           type: string
           format: date-time
@@ -1024,10 +993,6 @@ components:
           type: string
           description: Timezone
           example: "Asia/Kolkata"
-        created_at:
-          type: string
-          format: date-time
-          example: "2026-02-18T10:30:00Z"
 
     CreateEventRequest:
       type: object
@@ -1102,19 +1067,8 @@ components:
     # Participant Schemas
     Participant:
       type: object
+      description: An event participant (id, event_id, user_id, created_at, updated_at are internal fields not exposed in API)
       properties:
-        id:
-          type: integer
-          description: Unique participant record identifier
-          example: 1
-        event_id:
-          type: string
-          description: Associated event ID
-          example: "evt_xyz789"
-        user_id:
-          type: string
-          description: Associated user ID
-          example: "usr_def456"
         status:
           type: string
           enum: [invited, accepted, declined, responded]
@@ -1122,14 +1076,6 @@ components:
           example: "invited"
         user:
           $ref: '#/components/schemas/User'
-        created_at:
-          type: string
-          format: date-time
-          example: "2026-02-18T10:35:00Z"
-        updated_at:
-          type: string
-          format: date-time
-          example: "2026-02-18T10:35:00Z"
 
     AddParticipantRequest:
       type: object

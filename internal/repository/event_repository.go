@@ -82,45 +82,8 @@ func (r *eventRepository) GetByID(ctx context.Context, id string) (*models.Event
 		return nil, fmt.Errorf("failed to get event: %w", err)
 	}
 
-	// Load proposed slots
-	slotsQuery := `SELECT id, event_id, start_time, end_time, timezone, created_at 
-				   FROM proposed_slots WHERE event_id = ?`
-	rows, err := db.QueryContext(ctx, slotsQuery, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get proposed slots: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var slot models.ProposedSlot
-		if err := rows.Scan(&slot.ID, &slot.EventID, &slot.StartTime, &slot.EndTime,
-			&slot.Timezone, &slot.CreatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan proposed slot: %w", err)
-		}
-		event.ProposedSlots = append(event.ProposedSlots, slot)
-	}
-
-	// Load participants with user info
-	participantsQuery := `SELECT ep.id, ep.event_id, ep.user_id, ep.status, ep.created_at, ep.updated_at,
-						  u.id, u.name, u.email, u.created_at, u.updated_at
-						  FROM event_participants ep
-						  LEFT JOIN users u ON ep.user_id = u.id
-						  WHERE ep.event_id = ?`
-	pRows, err := db.QueryContext(ctx, participantsQuery, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get participants: %w", err)
-	}
-	defer pRows.Close()
-
-	for pRows.Next() {
-		var p models.EventParticipant
-		var user models.User
-		if err := pRows.Scan(&p.ID, &p.EventID, &p.UserID, &p.Status, &p.CreatedAt, &p.UpdatedAt,
-			&user.ID, &user.Name, &user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan participant: %w", err)
-		}
-		p.User = &user
-		event.Participants = append(event.Participants, p)
+	if err := r.loadRelated(ctx, db, &event); err != nil {
+		return nil, err
 	}
 
 	return &event, nil
@@ -253,5 +216,63 @@ func (r *eventRepository) List(ctx context.Context, filter models.EventFilter) (
 		return nil, 0, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	// Enrich each event with its proposed slots and participants
+	for _, event := range events {
+		if err := r.loadRelated(ctx, db, event); err != nil {
+			return nil, 0, err
+		}
+	}
+
 	return events, total, nil
+}
+
+// loadRelated fetches proposed slots and participants (with user info) for a
+// single event and attaches them to the event struct.
+func (r *eventRepository) loadRelated(ctx context.Context, db interface {
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+}, event *models.Event) error {
+	// Proposed slots
+	slotsQuery := `SELECT id, event_id, start_time, end_time, timezone, created_at
+				   FROM proposed_slots WHERE event_id = ?`
+	sRows, err := db.QueryContext(ctx, slotsQuery, event.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get proposed slots: %w", err)
+	}
+	defer sRows.Close()
+
+	for sRows.Next() {
+		var slot models.ProposedSlot
+		if err := sRows.Scan(&slot.ID, &slot.EventID, &slot.StartTime, &slot.EndTime,
+			&slot.Timezone, &slot.CreatedAt); err != nil {
+			return fmt.Errorf("failed to scan proposed slot: %w", err)
+		}
+		event.ProposedSlots = append(event.ProposedSlots, slot)
+	}
+
+	// Participants with user info
+	participantsQuery := `SELECT ep.id, ep.event_id, ep.user_id, ep.status,
+						  ep.created_at, ep.updated_at,
+						  u.id, u.name, u.email, u.created_at, u.updated_at
+						  FROM event_participants ep
+						  LEFT JOIN users u ON ep.user_id = u.id
+						  WHERE ep.event_id = ?`
+	pRows, err := db.QueryContext(ctx, participantsQuery, event.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get participants: %w", err)
+	}
+	defer pRows.Close()
+
+	for pRows.Next() {
+		var p models.EventParticipant
+		var user models.User
+		if err := pRows.Scan(&p.ID, &p.EventID, &p.UserID, &p.Status,
+			&p.CreatedAt, &p.UpdatedAt,
+			&user.ID, &user.Name, &user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
+			return fmt.Errorf("failed to scan participant: %w", err)
+		}
+		p.User = &user
+		event.Participants = append(event.Participants, p)
+	}
+
+	return nil
 }

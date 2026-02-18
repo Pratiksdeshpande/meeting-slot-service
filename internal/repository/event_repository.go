@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"meeting-slot-service/internal/database"
 	"meeting-slot-service/internal/models"
@@ -23,23 +24,39 @@ func (r *eventRepository) Create(ctx context.Context, event *models.Event) error
 	if err != nil {
 		return fmt.Errorf("failed to get database connection: %w", err)
 	}
+
+	now := time.Now()
 	query := `INSERT INTO events (id, title, description, organizer_id, duration_minutes, status, created_at, updated_at) 
-			  VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`
+			  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err = db.ExecContext(ctx, query, event.ID, event.Title, event.Description,
-		event.OrganizerID, event.DurationMinutes, event.Status)
+		event.OrganizerID, event.DurationMinutes, event.Status, now, now)
 	if err != nil {
 		return fmt.Errorf("failed to create event: %w", err)
 	}
 
+	// Set timestamps on the event object
+	event.CreatedAt = now
+	event.UpdatedAt = now
+
 	// Insert proposed slots
 	if len(event.ProposedSlots) > 0 {
 		slotQuery := `INSERT INTO proposed_slots (event_id, start_time, end_time, timezone, created_at) 
-					  VALUES (?, ?, ?, ?, NOW())`
-		for _, slot := range event.ProposedSlots {
-			_, err = db.ExecContext(ctx, slotQuery, event.ID, slot.StartTime, slot.EndTime, slot.Timezone)
+					  VALUES (?, ?, ?, ?, ?)`
+		for i := range event.ProposedSlots {
+			slotNow := time.Now()
+			result, err := db.ExecContext(ctx, slotQuery, event.ID, event.ProposedSlots[i].StartTime,
+				event.ProposedSlots[i].EndTime, event.ProposedSlots[i].Timezone, slotNow)
 			if err != nil {
 				return fmt.Errorf("failed to create proposed slot: %w", err)
 			}
+			// Get the auto-generated slot ID and set it on the slot object
+			slotID, err := result.LastInsertId()
+			if err != nil {
+				return fmt.Errorf("failed to get slot ID: %w", err)
+			}
+			event.ProposedSlots[i].ID = uint(slotID)
+			event.ProposedSlots[i].EventID = event.ID
+			event.ProposedSlots[i].CreatedAt = slotNow
 		}
 	}
 
@@ -222,7 +239,7 @@ func (r *eventRepository) List(ctx context.Context, filter models.EventFilter) (
 	}
 	defer rows.Close()
 
-	var events []*models.Event
+	events := make([]*models.Event, 0)
 	for rows.Next() {
 		var event models.Event
 		if err := rows.Scan(&event.ID, &event.Title, &event.Description, &event.OrganizerID,

@@ -4,78 +4,45 @@ A REST API service built in Go that helps geographically distributed teams find 
 
 ## 🎯 Problem Statement
 
-In distributed teams across multiple timezones, finding a common meeting time is challenging. This service solves that by:
-- Allowing organizers to propose multiple time slots
-- Collecting availability from all participants
-- Recommending optimal times that work for all (or most) participants
-- Providing fallback options when perfect alignment isn't possible
+In distributed teams across multiple timezones, finding a common meeting time is challenging:
+- Team members span continents (e.g., US, Europe, Asia)
+- Manual scheduling via email chains is time-consuming and error-prone
+- Timezone conversions lead to mistakes and missed meetings
+- Finding slots that work for everyone often requires multiple iterations
+
+---
+
+## Solution
+
+This service solves the meeting scheduling problem by:
+1. **Proposing Time Slots** - Organizers propose multiple potential meeting windows
+2. **Collecting Availability** - Participants submit their available times in their local timezone
+3. **Smart Recommendations** - Algorithm finds optimal times that work for all (or most) participants
+4. **Fallback Options** - Provides ranked alternatives when perfect alignment isn't possible
+
+---
 
 ## ✨ Features
 
-- **Event Management**: Create, update, and delete meeting events
-- **Availability Tracking**: Participants submit their available time slots
-- **Smart Recommendations**: Algorithm finds best meeting times considering all constraints
-- **Timezone Support**: Built-in handling of multiple timezones
-- **RESTful API**: Clean, well-documented REST endpoints
-- **AWS Native**: Deployed on AWS with ALB, Auto Scaling, RDS, and CloudWatch
-- **Horizontal Scalability**: Auto-scaling group handles variable load
-- **Production Monitoring**: CloudWatch logs, metrics, and dashboards
+- **Event Management** - Create, update, and delete meeting events with proposed time slots
+- **Availability Tracking** - Participants submit their available time windows
+- **Smart Recommendations** - Algorithm calculates best meeting times with availability percentages
+- **Timezone Support** - Built-in handling of multiple timezones (all stored/compared in UTC)
+- **RESTful API** - Clean, well-documented REST endpoints
+- **AWS Native** - Deployed on AWS with ALB, Auto Scaling, RDS, and CloudWatch
+- **Horizontal Scalability** - Auto-scaling group (1-4 instances) handles variable load
+- **Production Monitoring** - CloudWatch logs, metrics, dashboards, and alarms
 
-## 🏗️ Architecture
-
-```
-                    ┌─────────────────────────────────────┐
-                    │         Internet Traffic            │
-                    └──────────────┬──────────────────────┘
-                                   │
-                                   ▼
-                    ┌─────────────────────────────────────┐
-                    │   Application Load Balancer (ALB)   │
-                    │  • HTTP/HTTPS Load Distribution     │
-                    │  • Health Checks                    │
-                    └──────────────┬──────────────────────┘
-                                   │
-        ┌──────────────────────────┼──────────────────────────┐
-        │                          │                          │
-        ▼                          ▼                          ▼
-┌───────────────┐        ┌───────────────┐        ┌───────────────┐
-│  EC2 Instance │        │  EC2 Instance │        │  EC2 Instance │
-│  (Go Service) │        │  (Go Service) │        │  (Go Service) │
-│               │        │               │        │               │
-└───────┬───────┘        └───────┬───────┘        └───────┬───────┘
-        │                        │                        │
-        └────────────────────────┼────────────────────────┘
-                                 │
-                 ┌───────────────┴───────────────┐
-                 │                               │
-                 ▼                               ▼
-      ┌─────────────────┐            ┌─────────────────┐
-      │    AWS RDS      │            │  AWS Secrets    │
-      │    (MySQL)      │            │  Manager        │
-      │  • Multi-AZ     │            │                 │
-      └─────────────────┘            └─────────────────┘
-                 │
-                 ▼
-      ┌─────────────────┐
-      │  CloudWatch     │
-      │  • Logs         │
-      │  • Metrics      │
-      │  • Dashboards   │
-      │  • Alarms       │
-      └─────────────────┘
-
-Auto Scaling Group: 1-4 instances based on CPU utilization
-```
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Go 1.24+ (with toolchain set to go1.24.5)
-- MySQL 8.0+ (local installation or Docker)
-- Docker (optional, for running MySQL in container)
-- AWS CLI configured (for production deployment)
-- Terraform 1.0+ (for AWS infrastructure)
-- Postman (optional, for API testing)
+
+- **Go 1.24+** (with toolchain set to `go1.24.5`)
+- **MySQL 8.0+** (local installation or Docker)
+- **Docker** (optional, for running MySQL in container)
+- **Postman** (optional, for API testing)
 
 ### Local Development Setup
 
@@ -113,27 +80,7 @@ Then start the application:
 go run cmd/server/main.go
 ```
 
-#### Option 2: Using Make with Docker (Linux/Mac)
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/meeting-slot-service.git
-cd meeting-slot-service
-
-# Install dependencies
-make init
-
-# Start MySQL in Docker
-make docker-mysql
-
-# Run the service with environment variables loaded
-make run-local
-
-# When done, stop MySQL
-make docker-mysql-stop
-```
-
-#### Option 3: Docker MySQL (Windows PowerShell)
+#### Option 2: Docker MySQL (Windows PowerShell)
 
 ```powershell
 # Clone the repository
@@ -164,279 +111,16 @@ go run cmd/server/main.go
 docker stop mysql-meeting; docker rm mysql-meeting
 ```
 
-#### Option 4: Docker MySQL (Linux/Mac Bash)
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/meeting-slot-service.git
-cd meeting-slot-service
-
-# Install dependencies
-go mod download
-
-# Start MySQL in Docker
-docker run --name mysql-meeting \
-  -e MYSQL_ROOT_PASSWORD=password \
-  -e MYSQL_DATABASE=meetingslots \
-  -e MYSQL_USER=appuser \
-  -e MYSQL_PASSWORD=password \
-  -p 3306:3306 \
-  -d mysql:8.0
-
-# Wait ~30 seconds for MySQL to initialize
-
-# Load environment variables
-source env.local.sh
-
-# Run the service
-go run cmd/server/main.go
-
-# When done, stop MySQL
-docker stop mysql-meeting && docker rm mysql-meeting
-```
-
 The server will start on `http://localhost:8080`
 
-### Make Commands Reference
+---
 
-| Command | Description |
-|---------|-------------|
-| `make help` | Show all available commands |
-| `make init` | Download Go dependencies |
-| `make docker-mysql` | Start MySQL in Docker container |
-| `make docker-mysql-stop` | Stop and remove MySQL container |
-| `make docker-mysql-logs` | View MySQL container logs |
-| `make run` | Run the application |
-| `make run-local` | Load env.local.sh and run (Linux/Mac) |
-| `make build` | Build binary to `bin/server` |
-| `make test` | Run all tests |
-| `make test-coverage` | Run tests with coverage report |
-| `make clean` | Clean build artifacts |
-
-### Environment Files
+## Environment Files
 
 | File | Platform | Usage |
 |------|----------|-------|
+| `env.local.ps1` | Windows PowerShell | `. .\env.local.ps1` |
 | `env.local.sh` | Linux/Mac | `source env.local.sh` |
-| `env.local.ps1` | Windows | `. .\env.local.ps1` |
-
-### Testing with Postman
-
-#### Import API Collection
-1. Open Postman
-2. Click **Import** → Select `docs/swagger.yaml`
-3. This creates a collection with all 16 endpoints
-
-#### Sample API Flow
-
-**1. Health Check:**
-```
-GET http://localhost:8080/health
-```
-
-**2. Create a User:**
-```
-POST http://localhost:8080/api/v1/users
-Content-Type: application/json
-
-{
-  "name": "John Doe",
-  "email": "john@example.com"
-}
-```
-Save the returned `id` (e.g., `usr_abc123`)
-
-**3. Create an Event:**
-```
-POST http://localhost:8080/api/v1/events
-Content-Type: application/json
-
-{
-  "title": "Team Standup",
-  "description": "Daily sync meeting",
-  "organizer_id": "usr_abc123",
-  "duration_minutes": 30,
-  "proposed_slots": [
-    {
-      "start_time": "2026-02-18T09:00:00Z",
-      "end_time": "2026-02-18T10:00:00Z",
-      "timezone": "UTC"
-    },
-    {
-      "start_time": "2026-02-18T14:00:00Z",
-      "end_time": "2026-02-18T15:00:00Z",
-      "timezone": "UTC"
-    }
-  ]
-}
-```
-Save the returned `id` (e.g., `evt_xyz789`)
-
-**4. Add a Participant:**
-```
-POST http://localhost:8080/api/v1/events/evt_xyz789/participants
-Content-Type: application/json
-
-{
-  "user_id": "usr_abc123"
-}
-```
-
-**5. Submit Availability:**
-```
-POST http://localhost:8080/api/v1/events/evt_xyz789/participants/usr_abc123/availability
-Content-Type: application/json
-
-{
-  "slots": [
-    {
-      "start_time": "2026-02-18T09:00:00Z",
-      "end_time": "2026-02-18T10:00:00Z",
-      "timezone": "UTC"
-    }
-  ]
-}
-```
-
-**6. Get Recommendations:**
-```
-GET http://localhost:8080/api/v1/events/evt_xyz789/recommendations
-```
-
-### AWS Deployment
-
-```bash
-# Navigate to terraform directory
-cd terraform
-
-# Copy and configure variables
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-
-# Initialize Terraform
-terraform init
-
-# Plan deployment
-terraform plan
-
-# Apply infrastructure
-terraform apply
-
-# Get outputs
-terraform output
-```
-
-### Testing the API
-
-```bash
-# Create a user
-curl -X POST http://localhost:8080/api/v1/users \
-  -H "Content-Type: application/json" \
-  -d '{"name": "John Doe", "email": "john@example.com"}'
-
-# Create an event (use the user ID from above response)
-curl -X POST http://localhost:8080/api/v1/events \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Team Meeting",
-    "organizer_id": "usr_...",
-    "duration_minutes": 60,
-    "proposed_slots": [{
-      "start_time": "2025-02-20T14:00:00Z",
-      "end_time": "2025-02-20T16:00:00Z",
-      "timezone": "UTC"
-    }]
-  }'
-
-# Get recommendations
-curl http://localhost:8080/api/v1/events/evt_.../recommendations
-```
-
-## 🔗 API Documentation
-
-Full API documentation is available in OpenAPI/Swagger format:
-- **Swagger File**: [docs/swagger.yaml](./docs/swagger.yaml)
-
-### Core Endpoints
-
-```
-# Users
-POST   /api/v1/users                              # Create user
-GET    /api/v1/users/{id}                         # Get user
-PUT    /api/v1/users/{id}                         # Update user
-DELETE /api/v1/users/{id}                         # Delete user
-
-# Events
-POST   /api/v1/events                             # Create event
-GET    /api/v1/events                             # List events
-GET    /api/v1/events/{id}                        # Get event details
-PUT    /api/v1/events/{id}                        # Update event
-DELETE /api/v1/events/{id}                        # Delete event
-
-# Participants  
-POST   /api/v1/events/{id}/participants           # Add participant
-GET    /api/v1/events/{id}/participants           # List participants
-DELETE /api/v1/events/{id}/participants/{user_id} # Remove participant
-
-# Availability
-POST   /api/v1/events/{id}/participants/{user_id}/availability  # Submit
-PUT    /api/v1/events/{id}/participants/{user_id}/availability  # Update
-GET    /api/v1/events/{id}/participants/{user_id}/availability  # Get
-
-# Recommendations
-GET    /api/v1/events/{id}/recommendations        # Get recommended slots
-
-# Health
-GET    /health                                    # Health check
-```
-
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for system architecture and design decisions.
-
-## 🛠️ Technology Stack
-
-- **Language**: Go 1.24+
-- **Web Framework**: Gorilla Mux
-- **Database**: AWS RDS MySQL 8.0
-- **Database Access**: AWS SDK for Go v2, database/sql
-- **Configuration**: Environment variables + AWS Secrets Manager
-- **Infrastructure**: Terraform (AWS provider ~> 5.0)
-- **Cloud**: AWS
-  - **Compute**: EC2 (Auto Scaling Group with 1-4 instances)
-  - **Load Balancing**: Application Load Balancer
-  - **Database**: RDS MySQL (Multi-AZ)
-  - **Monitoring**: CloudWatch (Logs, Metrics, Dashboards, Alarms)
-  - **Security**: Secrets Manager, IAM roles, VPC
-- **Testing**: testify, httptest, go-sqlmock
-
-## ☁️ AWS Infrastructure
-
-The Terraform configuration provisions a production-ready, horizontally scalable infrastructure:
-
-| Resource | Description |
-|----------|-------------|
-| **Application Load Balancer** | Distributes traffic across EC2 instances with health checks |
-| **Auto Scaling Group** | 1-4 EC2 instances, scales based on CPU utilization |
-| **Launch Template** | Standardized EC2 configuration with CloudWatch agent |
-| **VPC** | Isolated network with 2 public + 2 private subnets across 2 AZs |
-| **RDS MySQL** | Managed database in private subnet with Multi-AZ support |
-| **CloudWatch** | Centralized logging, metrics, dashboards, and alarms |
-| **Secrets Manager** | Database credential storage |
-| **IAM** | Roles and policies for EC2 (Secrets Manager, CloudWatch, RDS access) |
-| **NAT Gateway** | Outbound internet for private subnets |
-| **S3** | ALB access logs storage with lifecycle policies |
-
-### Scalability Features
-- **Auto-Scaling Policies**: Scale up at >70% CPU, scale down at <20% CPU
-- **Target Tracking**: Maintain 50% average CPU utilization
-- **Health Checks**: ALB performs health checks every 30s on `/health` endpoint
-- **Zero-Downtime Deployments**: Rolling instance refresh with 50% min healthy
-
-### Monitoring & Observability
-- **Application Logs**: `/aws/ec2/{env}/application` - Application output
-- **Error Logs**: `/aws/ec2/{env}/error` - Error tracking
-- **System Logs**: `/aws/ec2/{env}/system` - OS-level logs
-- **Metrics Dashboard**: ALB, EC2, and RDS performance metrics
-- **Alarms**: CPU utilization (high/low), error rate threshold
 
 ### Environment Variables
 
@@ -449,240 +133,216 @@ The Terraform configuration provisions a production-ready, horizontally scalable
 | `DB_USER` | Database username | - |
 | `DB_PASSWORD` | Database password | - |
 | `DB_NAME` | Database name | `meetingslots` |
-| `DB_SECRET_ARN` | AWS Secrets Manager ARN | - |
-| `AWS_REGION` | AWS region | `us-east-1` |
-| `ENV` | Environment | `development` |
 
-## 📊 Project Status
+---
 
-**Current Phase**: ✅ Core + AWS Infrastructure Complete
+## 🧪 Testing with Postman
 
-Completed:
-- ✅ Project setup and configuration
-- ✅ Database models and migrations (MySQL)
-- ✅ Repository layer with AWS SDK (89.4% test coverage)
-- ✅ Service layer with business logic
-- ✅ **Core recommendation algorithm**
-- ✅ HTTP handlers with Gorilla Mux
-- ✅ Middleware (CORS, logging, recovery)
-- ✅ Unit tests with mocking (testify, go-sqlmock)
-- ✅ RESTful API with all CRUD operations
-- ✅ **Production-ready Terraform infrastructure**
-  - Application Load Balancer
-  - Auto Scaling Group (1-4 instances)
-  - CloudWatch logging and monitoring
-  - Multi-AZ RDS MySQL
-  - VPC with public/private subnets
-- ✅ **AWS Secrets Manager integration**
-- ✅ **Swagger/OpenAPI documentation**
-- ✅ **Horizontal scalability with auto-scaling policies**
-- ✅ **CloudWatch dashboards and alarms**
+For detailed API testing instructions with a complete step-by-step scenario, see:
 
-Pending:
-- ⏳ GitLab CI/CD pipeline setup
-- ⏳ Integration tests
-- ⏳ Production hardening
+📖 **[TEST-APIs.md](TEST-APIs.md)** - Complete API testing guide with example requests and responses
 
+---
 
+## 🚢 AWS Deployment
 
-## 🧪 Testing
+### Prerequisites
+- AWS CLI configured with appropriate credentials
+- Terraform 1.0+ installed
 
-```bash
-# Run all tests
-make test
-# or: go test -v ./...
+### Deploy Infrastructure
 
-# Run tests with coverage
-make test-coverage
-# or: go test -v -coverprofile=coverage.out ./...
-
-# Run specific package tests
-go test -v ./internal/service/...
-go test -v ./internal/utils/...
-
-# Run specific test
-go test -v -run TestRecommendationService_AllParticipantsAvailable ./internal/service/
-```
-
-## 🚢 Deployment
-
-### Local Development
-Run with local MySQL following the Quick Start guide above.
-
-### AWS Deployment with Terraform
-
-```bash
+```powershell
+# Navigate to terraform directory
 cd terraform
 
-# Configure variables
+# Copy and configure variables
 cp terraform.tfvars.example terraform.tfvars
-vim terraform.tfvars  # Edit with your values
+# Edit terraform.tfvars with your values
 
 # Set RDS password securely
-export TF_VAR_db_password="your-secure-password"
+$env:TF_VAR_db_password = "your-secure-password"
 
-# Deploy infrastructure
+# Initialize Terraform
 terraform init
+
+# Plan deployment
 terraform plan
+
+# Apply infrastructure
 terraform apply
 
 # Get Application Load Balancer URL
 terraform output alb_url
-terraform output deployment_summary  # Full deployment details
 ```
 
-### Post-Deployment
-1. The Auto Scaling Group automatically launches EC2 instances with your application
-2. Verify health check: `curl <alb_url>/health`
-3. Monitor via CloudWatch:
-   - Dashboard: Available in Terraform outputs
-   - Logs: Application, error, and system logs
-   - Metrics: ALB, EC2, and RDS performance
-4. Test scaling: Watch instances scale up/down based on load
+### Post-Deployment Verification
 
-### Accessing the Application
-```bash
+```powershell
 # Get the ALB URL
-ALB_URL=$(terraform output -raw alb_url)
+$ALB_URL = terraform output -raw alb_url
 
 # Health check
-curl $ALB_URL/health
+curl.exe "$ALB_URL/health"
 
-# Create a user
-curl -X POST $ALB_URL/api/v1/users \
-  -H "Content-Type: application/json" \
+# Create a test user
+curl.exe -X POST "$ALB_URL/api/v1/users" `
+  -H "Content-Type: application/json" `
   -d '{"name":"John Doe","email":"john@example.com"}'
 ```
 
-### Monitoring
-```bash
-# View CloudWatch Dashboard URL
-terraform output cloudwatch_dashboard_url
+### Infrastructure Components
 
-# Check Auto Scaling Group status
-aws autoscaling describe-auto-scaling-groups \
-  --auto-scaling-group-names $(terraform output -raw asg_name)
+| Resource | Description |
+|----------|-------------|
+| **Application Load Balancer** | Distributes traffic across EC2 instances |
+| **Auto Scaling Group** | 1-4 EC2 instances, scales based on CPU |
+| **RDS MySQL** | Managed database with Multi-AZ support |
+| **CloudWatch** | Logs, metrics, dashboards, and alarms |
+| **Secrets Manager** | Secure database credential storage |
+| **VPC** | Isolated network with public/private subnets |
 
-# View recent application logs
-aws logs tail /aws/ec2/dev/application --follow
-```
-
-## 📖 Documentation
-
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design decisions
-- **[docs/swagger.yaml](./docs/swagger.yaml)** - OpenAPI/Swagger API documentation
-
-## 🏗 Project Structure
-
-```
-meeting-slot-service/
-├── cmd/
-│   └── server/
-│       └── main.go              # Application entry point
-├── docs/
-│   └── swagger.yaml             # OpenAPI/Swagger documentation
-├── internal/
-│   ├── config/                  # Configuration management
-│   │   └── config.go
-│   ├── database/                # AWS SDK database connection
-│   │   └── database.go
-│   ├── handler/                 # HTTP request handlers
-│   │   ├── user_handler.go
-│   │   ├── event_handler.go
-│   │   └── availability_handler.go
-│   ├── middleware/              # HTTP middleware
-│   │   ├── logger.go
-│   │   ├── recovery.go
-│   │   └── cors.go
-│   ├── models/                  # Data models
-│   │   ├── user.go
-│   │   ├── event.go
-│   │   ├── slot.go
-│   │   ├── participant.go
-│   │   └── recommendation.go
-│   ├── repository/              # Data access layer (AWS SDK)
-│   │   ├── interface.go
-│   │   ├── user_repository.go
-│   │   ├── event_repository.go
-│   │   ├── availability_repository.go
-│   │   └── participant_repository.go
-│   ├── service/                 # Business logic
-│   │   ├── user_service.go
-│   │   ├── event_service.go
-│   │   ├── availability_service.go
-│   │   └── recommendation_service.go
-│   └── utils/                   # Utility functions
-│       ├── id_generator.go
-│       ├── time_utils.go
-│       └── response.go
-├── terraform/                   # AWS Infrastructure as Code
-│   ├── main.tf                  # Provider and locals
-│   ├── variables.tf             # Input variables
-│   ├── outputs.tf               # Output values
-│   ├── vpc.tf                   # VPC and networking (2 AZs)
-│   ├── security_groups.tf       # Security groups (ALB, EC2, RDS)
-│   ├── alb.tf                   # Application Load Balancer
-│   ├── autoscaling.tf           # Launch Template + Auto Scaling Group
-│   ├── ec2.tf                   # IAM roles and instance profile
-│   ├── rds.tf                   # RDS MySQL + Secrets Manager
-│   ├── cloudwatch.tf            # Logs, metrics, dashboard, alarms
-│   ├── terraform.tfvars.example # Variable template
-│   ├── README.md                # Detailed infrastructure documentation
-│   └── templates/
-│       └── user_data.sh         # EC2 bootstrap script with CloudWatch agent
-├── go.mod                       # Go dependencies
-├── Makefile                     # Build automation
-├── ARCHITECTURE.md              # Architecture documentation
-└── README.md
-```
-
-## 🧮 Core Algorithm
-
-The recommendation service implements a sliding window algorithm to find optimal meeting slots:
-
-### Algorithm Steps
-1. **Normalize times to UTC** - All times converted for consistent comparison
-2. **Generate candidate slots** - 15-minute sliding windows within proposed time ranges
-3. **Check participant availability** - For each candidate, verify overlap with user availability
-4. **Calculate availability rate** - Percentage of participants available for each slot
-5. **Sort and rank** - Order by availability rate, participant count, and time
-6. **Return top recommendations** - Up to 10 best options with full participant details
-
-### Performance
-- **Time Complexity**: O(P × C × U × S)
-  - P = proposed slots (~10)
-  - C = candidates per slot (~8, constant)
-  - U = participants (~20)
-  - S = availability slots per user (~5)
-- **Typical Performance**: ~1,000 operations for standard use case
-- **Optimizations**: UTC normalization, efficient interval checking
-
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed algorithm explanation and system design.
-
-## 🎓 Key Technical Highlights
-
-This project demonstrates:
-- ✅ **Clean Architecture** - Separation of concerns (handler → service → repository)
-- ✅ **REST API Design** - Following REST conventions and best practices
-- ✅ **Complex Algorithm** - Slot matching with timezone handling
-- ✅ **Database Design** - Normalized schema with relationships and constraints
-- ✅ **AWS SDK for Go v2** - Native AWS integration for RDS and Secrets Manager
-- ✅ **Infrastructure as Code** - Complete AWS infrastructure with Terraform
-- ✅ **Dependency Injection** - Testable, loosely coupled components
-- ✅ **Error Handling** - Consistent error responses and logging
-- ✅ **Middleware Pattern** - CORS, logging, panic recovery
-- ✅ **Unit Testing** - Mocks, table-driven tests, test coverage
-- ✅ **12-Factor App** - Environment-based configuration
-- ✅ **API Documentation** - OpenAPI/Swagger specification
-
-## 🤝 Contributing
-
-This is a personal coding exercise project, but suggestions and feedback are welcome!
-
-## 📝 License
-
-MIT License - feel free to use this as a reference for your own projects.
+For detailed infrastructure documentation, see [terraform/README.md](./terraform/README.md)
 
 ---
 
-**Status**: Core + AWS Infrastructure complete ✅ | Next: CI/CD pipeline and production hardening
+## 📖 API Documentation
+
+Full API documentation is available in OpenAPI/Swagger format:
+
+📖 **[docs/swagger.yaml](./docs/swagger.yaml)** - OpenAPI 3.0 specification
+
+### API Endpoints Overview
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/api/v1/users` | POST, GET | Create/list users |
+| `/api/v1/users/{id}` | GET, PUT, DELETE | User operations |
+| `/api/v1/events` | POST, GET | Create/list events |
+| `/api/v1/events/{id}` | GET, PUT, DELETE | Event operations |
+| `/api/v1/events/{id}/participants` | POST, GET | Manage participants |
+| `/api/v1/events/{id}/participants/{user_id}` | DELETE | Remove participant |
+| `/api/v1/events/{id}/participants/{user_id}/availability` | POST, PUT, GET | Availability operations |
+| `/api/v1/events/{id}/recommendations` | GET | Get meeting recommendations |
+
+---
+
+## 🛠️ Technology Stack
+
+| Component | Technology |
+|-----------|------------|
+| **Language** | Go 1.24+ |
+| **Web Framework** | Gorilla Mux |
+| **Database** | MySQL 8.0 (AWS RDS) |
+| **Database Access** | database/sql + AWS SDK for Go v2 |
+| **Infrastructure** | Terraform |
+| **Cloud Provider** | AWS (ALB, EC2, RDS, CloudWatch, Secrets Manager) |
+| **Testing** | testify, httptest, go-sqlmock |
+| **API Documentation** | OpenAPI/Swagger 3.0 |
+
+---
+
+## 🎯 Algorithm Visualization
+
+The **Slot Matching Algorithm** lives in `internal/service/recommendation_service.go` and uses a sliding window approach to find the optimal meeting time across all proposed slots.
+
+### Algorithm Steps
+
+1. **Normalize to UTC** - All times converted for consistent comparison
+2. **Generate Candidates** - 15-minute sliding windows within proposed time ranges
+3. **Check Availability** - For each candidate, verify overlap with user availability
+4. **Calculate Rate** - Percentage of participants available for each slot
+5. **Rank Results** - Order by availability rate, then by time
+6. **Return Best** - Top recommendation with participant details
+
+
+### Step-by-Step Walkthrough
+
+```
+═══════════════════════════════════════════════════════════════════
+  INPUTS
+═══════════════════════════════════════════════════════════════════
+
+  Proposed Window:  [════════════════════════]  16:00 → 19:00 UTC
+  Meeting Duration: 90 minutes
+  Participants:     4 (Sarah, Raj, Emma, Carlos)
+
+═══════════════════════════════════════════════════════════════════
+  STEP 1: Generate Candidate Slots (15-min sliding window)
+═══════════════════════════════════════════════════════════════════
+
+  16:00 ──────────────────────────────────────────── 19:00
+    │                                                   │
+    [══════════════]                    16:00 → 17:30  Candidate A
+        [══════════════]                16:15 → 17:45  Candidate B
+            [══════════════]            16:30 → 18:00  Candidate C
+                [══════════════]        16:45 → 18:15  Candidate D
+                    [══════════════]    17:00 → 18:30  Candidate E
+                        [══════════════]17:15 → 18:45  Candidate F
+                            [══════════]17:30 → 19:00  Candidate G
+
+═══════════════════════════════════════════════════════════════════
+  STEP 2: Map Participant Availability Windows (UTC)
+═══════════════════════════════════════════════════════════════════
+
+  15:00          16:00          17:00          18:00          19:00
+    │              │              │              │              │
+    Sarah:         [══════════════════════════]  16:00 → 19:00
+    Raj:      [═══════════════════════]          15:30 → 18:30
+    Emma:  [══════════════════════]              15:00 → 18:00
+    Carlos:[════════════════════════════════════]15:00 → 20:00
+
+═══════════════════════════════════════════════════════════════════
+  STEP 3: Score Each Candidate
+          User is available if candidate window ⊆ user's window
+═══════════════════════════════════════════════════════════════════
+
+  Candidate        Sarah    Raj     Emma   Carlos    Score
+  ─────────────────────────────────────────────────────────
+  A: 16:00–17:30     ✓       ✓       ✓       ✓      4/4 = 100% ★ BEST
+  B: 16:15–17:45     ✓       ✓       ✓       ✓      4/4 = 100%
+  C: 16:30–18:00     ✓       ✓       ✓       ✓      4/4 = 100%
+  D: 16:45–18:15     ✓       ✓       ✗       ✓      3/4 =  75%
+  E: 17:00–18:30     ✓       ✓       ✗       ✓      3/4 =  75%
+  F: 17:15–18:45     ✓       ✗       ✗       ✓      2/4 =  50%
+  G: 17:30–19:00     ✓       ✗       ✗       ✓      2/4 =  50%
+
+═══════════════════════════════════════════════════════════════════
+  STEP 4: Rank & Return Best
+          Sort by: availability rate DESC → time ASC
+═══════════════════════════════════════════════════════════════════
+
+  ★ WINNER: Candidate A — 16:00–17:30 UTC
+    available_participants: 4
+    availability_rate:      1.0  (100%)
+    available_users:        [sarah, raj, emma, carlos]
+    unavailable_users:      []
+
+═══════════════════════════════════════════════════════════════════
+  COMPLEXITY
+═══════════════════════════════════════════════════════════════════
+
+  O(P × C × U × S)
+    P = proposed slots      (~3–10)
+    C = candidates/slot     (fixed: window_minutes / 15 - duration/15 + 1)
+    U = participants        (~4–20)
+    S = avail. slots/user   (~1–5)
+
+  Example: 3 slots × 7 candidates × 4 users × 3 slots/user = 252 ops
+  Runs in microseconds even for large teams
+```
+
+---
+
+## Documentation
+
+| Document                                     | Description                                      |
+|----------------------------------------------|--------------------------------------------------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md)         | System architecture, data flow, component design |
+| [TEST-APIs.md](TEST-APIs.md)                 | Step-by-step API testing guide                   |
+| [docs/swagger.yaml](./docs/swagger.yaml)     | OpenAPI specification                            |
+| [terraform/README.md](./terraform/README.md) | Infrastructure documentation                     |
+
+---
+

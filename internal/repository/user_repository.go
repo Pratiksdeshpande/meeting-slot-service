@@ -128,7 +128,7 @@ func (r *userRepository) List(ctx context.Context, limit, offset int) ([]*models
 	}
 	defer rows.Close()
 
-	var users []*models.User
+	users := make([]*models.User, 0)
 	for rows.Next() {
 		var user models.User
 		if err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {

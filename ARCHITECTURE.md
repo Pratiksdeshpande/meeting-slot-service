@@ -1,6 +1,8 @@
 # Architecture Overview
 
-Visual representation of the meeting slot service architecture and data flow.
+Visual representation of the meeting slot service architecture, data flow, and core algorithm.
+
+---
 
 ## 🏛️ System Architecture
 
@@ -14,7 +16,6 @@ Visual representation of the meeting slot service architecture and data flow.
 ┌─────────────────────────────────────────────────────────────────┐
 │          AWS Application Load Balancer (ALB)                    │
 │  • Health Checks (/health every 30s)                            │
-│  • SSL/TLS Termination (optional)                               │
 │  • Cross-zone Load Balancing                                    │
 └────────────────────────────┬────────────────────────────────────┘
                              │
@@ -33,23 +34,24 @@ Visual representation of the meeting slot service architecture and data flow.
          • Scale down: CPU < 20%
                            │
 ┌──────────────────────────┼─────────────────────────────────────┐
-│     Meeting Slot Service │(Go) - Application Container         │
-│  ┌───────────────────────┼───────────────────────────────┐     │
-│  │          HTTP Handler │Layer                          │     │
-│  │  • Event Handlers  • Availability Handlers            │     │
-│  │  • Health Check    • Middleware (CORS, Logging)       │     │
+│     Meeting Slot Service (Go) - Application Layer              │
+│  ┌───────────────────────────────────────────────────────┐     │
+│  │                  HTTP Handler Layer                   │     │
+│  │  • User Handlers        • Event Handlers              │     │
+│  │  • Availability Handlers• Health Check                │     │
+│  │  • Middleware (CORS, Logging, Recovery)               │     │
 │  └───────────────────────┬───────────────────────────────┘     │
 │                          │                                     │
 │  ┌───────────────────────▼───────────────────────────────┐     │
 │  │                   Service Layer                       │     │
-│  │  • Event Service   • Availability Service             │     │
-│  │  • Recommendation Service (Algorithm)                 │     │
+│  │  • User Service         • Event Service               │     │
+│  │  • Availability Service • Recommendation Service      │     │
 │  └───────────────────────┬───────────────────────────────┘     │
 │                          │                                     │
 │  ┌───────────────────────▼───────────────────────────────┐     │
 │  │                 Repository Layer                      │     │
-│  │  • Event Repository  • User Repository                │     │
-│  │  • Availability Repository                            │     │
+│  │  • User Repository      • Event Repository            │     │
+│  │  • Availability Repository  • Participant Repository  │     │
 │  └───────────────────────┬───────────────────────────────┘     │
 └──────────────────────────┼─────────────────────────────────────┘
                            │
@@ -61,565 +63,328 @@ Visual representation of the meeting slot service architecture and data flow.
     │  MySQL 8.0   │ │  Manager     │ │ • Logs       │
     │  (Multi-AZ)  │ │ (DB Creds)   │ │ • Metrics    │
     │              │ │              │ │ • Dashboard  │
-    └──────────────┘ └──────────────┘ │ • Alarms     │
-                                      └──────────────┘
+    │              │ │              │ │ • Alarms     │
+    └──────────────┘ └──────────────┘ └──────────────┘
 ```
+
+---
 
 ## 🔄 Request Flow
 
-### 1. Create Event Flow
+### 1. Create Event
 
 ```
-Client                  API                Service              Repository         Database
-  │                      │                    │                     │                 │
-  │ POST /events         │                    │                     │                 │
-  ├──────────────────────>                    │                     │                 │
-  │                      │ CreateEvent()      │                     │                 │
-  │                      ├────────────────────>                     │                 │
-  │                      │                    │ event.Create()      │                 │
-  │                      │                    ├─────────────────────>                 │
-  │                      │                    │                     │ INSERT          │
-  │                      │                    │                     ├─────────────────>
-  │                      │                    │                     │<─────────────────
-  │                      │                    │<─────────────────────                 │
-  │                      │<────────────────────                     │                 │
-  │ 201 Created          │                    │                     │                 │
-  │<──────────────────────                    │                     │                 │
-  │ {event_id: "evt_123"}│                    │                     │                 │
+Client             Handler            Service           Repository        Database
+  │                   │                  │                   │                │
+  │ POST /events      │                  │                   │                │
+  ├──────────────────►│                  │                   │                │
+  │                   │ Decode JSON      │                   │                │
+  │                   │ CreateEvent()    │                   │                │
+  │                   ├─────────────────►│                   │                │
+  │                   │                  │ Validate organizer│                │
+  │                   │                  │ exists            │                │
+  │                   │                  ├──────────────────►│                │
+  │                   │                  │◄──────────────────┤                │
+  │                   │                  │ Validate slots    │                │
+  │                   │                  │ Generate event ID │                │
+  │                   │                  │ repo.Create()     │                │
+  │                   │                  ├──────────────────►│                │
+  │                   │                  │                   │ INSERT events  │
+  │                   │                  │                   ├───────────────►│
+  │                   │                  │                   │ INSERT slots   │
+  │                   │                  │                   ├───────────────►│
+  │                   │                  │                   │◄───────────────┤
+  │                   │                  │◄──────────────────┤ (IDs + times)  │
+  │                   │◄─────────────────┤                   │                │
+  │ 201 Created       │                  │                   │                │
+  │◄──────────────────┤                  │                   │                │
+  │ {event with slots}│                  │                   │                │
 ```
 
-### 2. Submit Availability Flow
+### 2. Submit Availability
 
 ```
-Client                  API                Service              Repository         Database
-  │                      │                    │                     │                 │
-  │ POST /events/{id}/   │                    │                     │                 │
-  │   availability       │                    │                     │                 │
-  ├──────────────────────>                    │                     │                 │
-  │                      │ SubmitAvailability()                     │                 │
-  │                      ├────────────────────>                     │                 │
-  │                      │                    │ ValidateTimeSlots() │                 │
-  │                      │                    │ NormalizeTimezones()│                 │
-  │                      │                    │ availability.Create()                 │
-  │                      │                    ├─────────────────────>                 │
-  │                      │                    │                     │ INSERT          │
-  │                      │                    │                     ├─────────────────>
-  │                      │                    │                     │<─────────────────
-  │                      │                    │ InvalidateCache()   │                 │
-  │                      │                    │<─────────────────────                 │
-  │                      │<────────────────────                     │                 │
-  │ 200 OK               │                    │                     │                 │
-  │<──────────────────────                    │                     │                 │
+Client             Handler            Service           Repository        Database
+  │                   │                  │                   │                │
+  │ POST /events/{id}/│                  │                   │                │
+  │  participants/    │                  │                   │                │
+  │  {uid}/availabil. │                  │                   │                │
+  ├──────────────────►│                  │                   │                │
+  │                   │ Decode JSON      │                   │                │
+  │                   │ SubmitAvailabil. │                   │                │
+  │                   ├─────────────────►│                   │                │
+  │                   │                  │ Verify event      │                │
+  │                   │                  │ exists            │                │
+  │                   │                  ├──────────────────►│                │
+  │                   │                  │◄──────────────────┤                │
+  │                   │                  │ Verify user is    │                │
+  │                   │                  │ a participant     │                │
+  │                   │                  ├──────────────────►│                │
+  │                   │                  │◄──────────────────┤                │
+  │                   │                  │ Validate slots    │                │
+  │                   │                  │ (end > start)     │                │
+  │                   │                  │ Normalize to UTC  │                │
+  │                   │                  │ repo.CreateSlots()│                │
+  │                   │                  ├──────────────────►│                │
+  │                   │                  │                   │ INSERT avail.  │
+  │                   │                  │                   ├───────────────►│
+  │                   │                  │                   │◄───────────────┤
+  │                   │                  │◄──────────────────┤                │
+  │                   │◄─────────────────┤                   │                │
+  │ 200 OK            │                  │                   │                │
+  │◄──────────────────┤                  │                   │                │
+  │ {message: success}│                  │                   │                │
 ```
 
-### 3. Get Recommendations Flow
+### 3. Get Recommendations
 
 ```
-Client         API            Service         Repository       Database
-  │             │                 │              │                 │               │
-  │ GET /events/ │                 │              │                 │               │
-  │  {id}/recom- │                 │              │                 │               │
-  │  mendations  │                 │              │                 │               │
-  ├──────────────>                 │              │                 │               │
-  │             │ GetRecommendations()            │                 │               │
-  │             ├─────────────────>               │                 │               │
-  │             │                 │ LoadEventData()                 │               │
-  │             │                 ├─────────────────────────────────>               │
-  │             │                 │                 │               │ SELECT        │
-  │             │                 │                 │               ├───────────────>
-  │             │                 │                 │               │<───────────────
-  │             │                 │<─────────────────────────────────               │
-  │             │                 │ LoadAvailabilities()            │               │
-  │             │                 ├─────────────────────────────────>               │
-  │             │                 │                 │               │ SELECT        │
-  │             │                 │                 │               ├───────────────>
-  │             │                 │                 │               │<───────────────
-  │             │                 │<─────────────────────────────────               │
-  │             │                 │ RunAlgorithm() │                │               │
-  │             │<─────────────────                │                │               │
-  │ 200 OK      │                 │                │                │               │
-  │<────────────                  │                │                │               │
-  │ {recommendations}             │                │                │               │
+Client             Handler            Service           Repository        Database
+  │                   │                  │                   │                │
+  │ GET /events/{id}/ │                  │                   │                │
+  │  recommendations  │                  │                   │                │
+  ├──────────────────►│                  │                   │                │
+  │                   │ GetRecommend.()  │                   │                │
+  │                   ├─────────────────►│                   │                │
+  │                   │                  │ Load event +      │                │
+  │                   │                  │ proposed slots    │                │
+  │                   │                  ├──────────────────►│                │
+  │                   │                  │                   │ SELECT events  │
+  │                   │                  │                   │ + slots        │
+  │                   │                  │                   ├───────────────►│
+  │                   │                  │                   │◄───────────────┤
+  │                   │                  │◄──────────────────┤                │
+  │                   │                  │ Load all avail.   │                │
+  │                   │                  │ slots (all users) │                │
+  │                   │                  ├──────────────────►│                │
+  │                   │                  │                   │ SELECT avail.  │
+  │                   │                  │                   ├───────────────►│
+  │                   │                  │                   │◄───────────────┤
+  │                   │                  │◄──────────────────┤                │
+  │                   │                  │ Run Slot Matching │                │
+  │                   │                  │ Algorithm         │                │
+  │                   │                  │  → Generate       │                │
+  │                   │                  │    candidates     │                │
+  │                   │                  │  → Score each     │                │
+  │                   │                  │  → Pick best slot │                │
+  │                   │◄─────────────────┤                   │                │
+  │ 200 OK            │                  │                   │                │
+  │◄──────────────────┤                  │                   │                │
+  │ {best_recommend.} │                  │                   │                │
 ```
+
+---
 
 ## 🧩 Component Breakdown
 
-### 1. HTTP Handler Layer
-**Responsibility**: HTTP request/response handling, validation, routing
+### Project Structure
 
-```go
-// Handles:
-- Request parsing and validation
-- Response formatting
-- HTTP status codes
-- Middleware execution (logging, CORS, recovery)
-- Error handling
+```
+meeting-slot-service/
+├── cmd/
+│   └── server/
+│       └── main.go                      # Entry point, router setup, dependency injection
+├── docs/
+│   └── swagger.yaml                     # OpenAPI 3.0 specification
+├── internal/
+│   ├── config/
+│   │   └── config.go                    # Env var loading, DB config, server config
+│   ├── database/
+│   │   └── database.go                  # MySQL connection, AWS Secrets Manager integration
+│   ├── handler/
+│   │   ├── user_handler.go              # CRUD endpoints for users
+│   │   ├── event_handler.go             # Event + participant endpoints
+│   │   └── availability_handler.go      # Availability + recommendations endpoints
+│   ├── middleware/
+│   │   ├── logger.go                    # Request/response logging
+│   │   ├── recovery.go                  # Panic recovery
+│   │   └── cors.go                      # CORS headers
+│   ├── models/
+│   │   ├── user.go                      # User struct
+│   │   ├── event.go                     # Event struct, EventFilter, status constants
+│   │   ├── slot.go                      # ProposedSlot + AvailabilitySlot structs
+│   │   ├── participant.go               # EventParticipant struct + status constants
+│   │   └── recommendation.go            # Recommendation + RecommendationResponse structs
+│   ├── repository/
+│   │   ├── interface.go                 # Repository interfaces (for testability)
+│   │   ├── user_repository.go           # User DB operations
+│   │   ├── event_repository.go          # Event + proposed slot DB operations
+│   │   ├── availability_repository.go   # Availability slot DB operations
+│   │   └── participant_repository.go    # Event participant DB operations
+│   ├── service/
+│   │   ├── user_service.go              # User business logic
+│   │   ├── event_service.go             # Event business logic, participant management
+│   │   ├── availability_service.go      # Availability validation + persistence
+│   │   └── recommendation_service.go    # Slot matching algorithm (core)
+│   └── utils/
+│       ├── id_generator.go              # Prefixed ID generation (usr_, evt_)
+│       ├── time_utils.go                # Timezone normalization helpers
+│       └── response.go                  # Standardized JSON response helpers
+├── terraform/                           # AWS infrastructure (ALB, ASG, RDS, CloudWatch)
+├── env.local.ps1                        # Windows env vars for local dev
+├── env.local.sh                         # Linux/Mac env vars for local dev
+├── Makefile
+└── go.mod
 ```
 
-**Key Files**:
-- `internal/handler/event_handler.go`
-- `internal/handler/availability_handler.go`
+### Layer Responsibilities
 
-### 2. Service Layer
-**Responsibility**: Business logic, orchestration, algorithm
+| Layer          | Responsibility                                        | Key Files              |
+|----------------|-------------------------------------------------------|------------------------|
+| **Handler**    | Parse HTTP requests, validate input, write responses  | `internal/handler/`    |
+| **Middleware** | Cross-cutting concerns: logging, CORS, panic recovery | `internal/middleware/` |
+| **Service**    | Business logic, validation rules, algorithm execution | `internal/service/`    |
+| **Repository** | SQL queries, data mapping, database transactions      | `internal/repository/` |
+| **Models**     | Data structures shared across all layers              | `internal/models/`     |
+| **Utils**      | ID generation, timezone helpers, response formatting  | `internal/utils/`      |
 
-```go
-// Handles:
-- Business rules validation
-- Multi-repository coordination
-- Algorithm execution
-- Transaction management
-```
-
-**Key Files**:
-- `internal/service/event_service.go`
-- `internal/service/availability_service.go`
-- `internal/service/recommendation_service.go`
-
-### 3. Repository Layer
-**Responsibility**: Data access, database operations
-
-```go
-// Handles:
-- CRUD operations
-- Query building
-- Database transactions
-- Data mapping (DB <-> Models)
-```
-
-**Key Files**:
-- `internal/repository/event_repo.go`
-- `internal/repository/availability_repo.go`
-- `internal/repository/user_repo.go`
-
-### 4. Algorithm Package
-**Responsibility**: Core slot matching logic
-
-```go
-// Handles:
-- Time slot overlap detection
-- Candidate generation
-- Availability calculation
-- Recommendation ranking
-```
-
-**Key Files**:
-- `pkg/algorithm/slot_matcher.go`
-- `pkg/algorithm/interval_tree.go`
+---
 
 ## 📊 Data Model
 
 ### Entity Relationship Diagram
 
 ```
-┌─────────────┐
-│    Users    │
-│─────────────│
-│ id (PK)     │
-│ name        │
-│ email       │◄────────┐
-│ created_at  │         │
-└─────────────┘         │
-                        │
-                        │ organizer_id
-                        │
-                   ┌────┴──────────┐
-                   │    Events     │
-                   │───────────────│
-                   │ id (PK)       │
-                   │ title         │
-                   │ organizer_id  │
-                   │ duration_min  │
-                   │ status        │
-                   │ created_at    │
-                   └───┬───────────┘
-                       │
-         ┌─────────────┼─────────────┐
-         │             │             │
-         │             │             │
-    ┌────▼──────┐ ┌───▼────────┐ ┌──▼────────────┐
-    │ Proposed  │ │   Event    │ │ Availability  │
-    │   Slots   │ │Participants│ │    Slots      │
-    │───────────│ │────────────│ │───────────────│
-    │ id (PK)   │ │ id (PK)    │ │ id (PK)       │
-    │ event_id  │ │ event_id   │ │ event_id      │
-    │ start_time│ │ user_id    │ │ user_id       │
-    │ end_time  │ │ status     │ │ start_time    │
-    │ timezone  │ └────────────┘ │ end_time      │
-    └───────────┘                │ timezone      │
-                                 └───────────────┘
+┌──────────────────┐
+│      users       │
+│──────────────────│
+│ id        VARCHAR│◄──────────────────────────────────┐
+│ name      VARCHAR│                                   │
+│ email     VARCHAR│◄────────────┐                     │
+│ created_at       │             │ organizer_id        │ user_id
+│ updated_at       │             │                     │
+└──────────────────┘             │                     │
+                            ┌────┴───────────┐   ┌─────┴───────────────┐
+                            │    events      │   │ event_participants  │
+                            │────────────────│   │─────────────────────│
+                            │ id      VARCHAR│──►│ id          UINT    │
+                            │ title          │   │ event_id    VARCHAR │
+                            │ description    │   │ user_id     VARCHAR │
+                            │ organizer_id   │   │ status      VARCHAR │
+                            │ duration_min   │   │ created_at          │
+                            │ status         │   │ updated_at          │
+                            │ created_at     │   └─────────────────────┘
+                            │ updated_at     │
+                            │ deleted_at     │
+                            └────┬───────────┘
+                                 │ event_id (FK)
+                    ┌────────────┴────────────┐
+                    │                         │
+          ┌─────────▼──────────┐   ┌──────────▼───────────┐
+          │   proposed_slots   │   │  availability_slots  │
+          │────────────────────│   │──────────────────────│
+          │ id         UINT    │   │ id          UINT     │
+          │ event_id   VARCHAR │   │ event_id    VARCHAR  │
+          │ start_time DATETIME│   │ user_id     VARCHAR  │
+          │ end_time   DATETIME│   │ start_time  DATETIME │
+          │ timezone   VARCHAR │   │ end_time    DATETIME │
+          │ created_at         │   │ timezone    VARCHAR  │
+          └────────────────────┘   │ created_at           │
+                                   └──────────────────────┘
 ```
 
 ### Data Flow Example
 
-**Scenario**: Finding best meeting time for 3 people
+**Scenario**: Finding a 90-minute meeting slot for a 4-person global team
 
 ```
-1. Event Created:
-   ┌────────────────────────┐
-   │ Event: "Q1 Planning"   │
-   │ Duration: 60 min       │
-   │ Proposed Slots:        │
-   │  - Jan 12, 2-4PM EST   │
-   │  - Jan 14, 6-8PM EST   │
-   └────────────────────────┘
+Step 1 — Organizer creates event with proposed time windows:
+  ┌──────────────────────────────────────────────────────────────┐
+  │ Event: "Q1 Brainstorming" | Duration: 90 min                 │
+  │ Proposed Slots (stored as UTC):                              │
+  │   Slot 1: Jan 15, 22:00 → Jan 16, 01:00 UTC                  │
+  │   Slot 2: Jan 16, 16:00 → Jan 16, 19:00 UTC  ← Target        │
+  │   Slot 3: Jan 18, 02:00 → Jan 18, 05:00 UTC                  │
+  └──────────────────────────────────────────────────────────────┘
 
-2. Users Submit Availability:
-   ┌──────────────────────────────────────────────────────┐
-   │ User A: Jan 12 2-3:30PM EST, Jan 14 6-8PM EST       │
-   │ User B: Jan 12 2-4PM EST, Jan 14 7-8PM EST          │
-   │ User C: Jan 12 3-4PM EST, Jan 14 6-7:30PM EST       │
-   └──────────────────────────────────────────────────────┘
+Step 2 — Organizer registers all 4 participants at once:
+  ┌──────────────────────────────────────────────────────────────┐
+  │ POST /events/{id}/participants                               │
+  │ { "user_ids": ["sarah_id","raj_id","emma_id","carlos_id"] }  │
+  │ → 4 rows inserted into event_participants table              │
+  └──────────────────────────────────────────────────────────────┘
 
-3. Algorithm Processes:
-   ┌────────────────────────────────────────────┐
-   │ Normalize to UTC                           │
-   │ Generate candidates (15-min intervals)     │
-   │ Check each candidate against all users     │
-   │ Calculate availability rates               │
-   │ Sort by best match                         │
-   └────────────────────────────────────────────┘
+Step 3 — Each participant submits their available windows in local time:
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Sarah  (SF   / PST UTC-8):   8:00AM–11:00AM PST             │
+  │  Raj    (BLR  / IST UTC+5:30):9:30PM–12:30AM IST             │
+  │  Emma   (BER  / CET UTC+1):   4:00PM–7:00PM  CET             │
+  │  Carlos (NYC  / EST UTC-5):  10:00AM–3:00PM  EST             │
+  │                                                              │
+  │  → All stored in availability_slots as UTC after conversion  │
+  └──────────────────────────────────────────────────────────────┘
 
-4. Recommendations Returned:
-   ┌─────────────────────────────────────────────────┐
-   │ 1. Jan 14, 6-7PM EST (100% - all available)    │
-   │ 2. Jan 12, 3-4PM EST (66% - A, C available)    │
-   │ 3. Jan 12, 2-3PM EST (66% - A, B available)    │
-   └─────────────────────────────────────────────────┘
+Step 4 — Algorithm finds the best slot and returns recommendation:
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Best Slot: Jan 16, 16:00–17:30 UTC (90 min)                 │
+  │  Availability: 4/4 → 100%                                    │
+  │  In local times:                                             │
+  │    Sarah  → 8:00AM  PST  ✅ Morning hours                    │
+  │    Raj    → 9:30PM  IST  ✅ Late evening                     │
+  │    Emma   → 5:00PM  CET  ✅ End of work day                  │
+  │    Carlos → 11:00AM EST  ✅ Mid-morning                      │
+  │                                                              │
+  │  Message: "Perfect match! All 4 participants are available"  │
+  └──────────────────────────────────────────────────────────────┘
 ```
 
-## 🎯 Algorithm Visualization
-
-### Slot Matching Algorithm
-
-```
-Input:
-  Proposed Window: ═══════════════════════════  (2:00 PM - 4:00 PM)
-  Duration Needed:     ══════ (60 minutes)
-  
-Candidate Generation (15-min sliding window):
-  Candidate 1:      ══════                       (2:00 PM - 3:00 PM)
-  Candidate 2:         ══════                    (2:15 PM - 3:15 PM)
-  Candidate 3:            ══════                 (2:30 PM - 3:30 PM)
-  Candidate 4:               ══════              (2:45 PM - 3:45 PM)
-  Candidate 5:                  ══════           (3:00 PM - 4:00 PM)
-
-User Availability Check:
-  User A:           ════════════                 (2:00 PM - 3:30 PM)
-  User B:           ════════════════════         (2:00 PM - 4:00 PM)
-  User C:                      ════════          (3:00 PM - 4:00 PM)
-
-Overlap Analysis:
-  Candidate 1:      ✓ ✓ ✗  (66% available)
-  Candidate 2:      ✓ ✓ ✗  (66% available)
-  Candidate 3:      ✓ ✓ ✗  (66% available)
-  Candidate 4:      ✗ ✓ ✓  (66% available)
-  Candidate 5:      ✗ ✓ ✓  (66% available)
-
-Best Recommendation: Candidates 1-3 (earlier times preferred)
-```
+---
 
 ## 🚀 Deployment Architecture
 
-### AWS Production Infrastructure (Implemented)
-
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         AWS Cloud (VPC)                         │
-│                                                                 │
+┌────────────────────────────────────────────────────────────────┐
+│                         AWS Cloud (VPC)                        │
+│                                                                │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │         Public Subnets (2 AZs)                           │  │
+│  │               Public Subnets (2 Availability Zones)      │  │
 │  │                                                          │  │
-│  │  ┌────────────────────────────────────────────────────┐ │  │
-│  │  │   Application Load Balancer (ALB)                  │ │  │
-│  │  │   • HTTP Listener (Port 80)                        │ │  │
-│  │  │   • HTTPS Listener (Port 443 - optional)           │ │  │
-│  │  │   • Health Checks: /health (30s interval)          │ │  │
-│  │  │   • Target Group: EC2 instances on port 8080       │ │  │
-│  │  └───────────────────┬────────────────────────────────┘ │  │
-│  │                      │                                   │  │
-│  │        ┌─────────────┼─────────────┐                    │  │
-│  │        │             │             │                    │  │
-│  │        ▼             ▼             ▼                    │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐             │  │
-│  │  │ EC2 #1   │  │ EC2 #2   │  │ EC2 #3   │             │  │
-│  │  │ Go App   │  │ Go App   │  │ Go App   │ ...         │  │
-│  │  └──────────┘  └──────────┘  └──────────┘             │  │
-│  │        │             │             │                    │  │
-│  │        └─────────────┼─────────────┘                    │  │
-│  │                      │                                   │  │
-│  │         Auto Scaling Group                              │  │
-│  │         • Min: 1 instance                               │  │
-│  │         • Max: 4 instances                              │  │
-│  │         • Desired: 2 instances                          │  │
-│  │         • Launch Template with user_data                │  │
-│  │         • Instance refresh for zero-downtime deploys    │  │
-│  └──────────────────────┬────────────────────────────────────┘  │
-│                         │                                        │
-│  ┌──────────────────────▼────────────────────────────────────┐  │
-│  │         Private Subnets (2 AZs)                           │  │
-│  │                                                           │  │
-│  │  ┌───────────────────────────────────────────────────┐   │  │
-│  │  │  AWS RDS MySQL 8.0                                │   │  │
-│  │  │  • Multi-AZ Deployment                            │   │  │
-│  │  │  • Automated backups                              │   │  │
-│  │  │  • Storage auto-scaling (20-100 GB)               │   │  │
-│  │  │  • Encryption at rest                             │   │  │
-│  │  │  • Performance Insights (prod)                    │   │  │
-│  │  └───────────────────────────────────────────────────┘   │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Supporting Services                                      │  │
-│  │  • AWS Secrets Manager (DB credentials)                  │  │
-│  │  • CloudWatch Logs (app, error, system, access)          │  │
-│  │  • CloudWatch Metrics & Dashboard                        │  │
-│  │  • CloudWatch Alarms (CPU high/low, error rate)          │  │
-│  │  • S3 Bucket (ALB access logs)                           │  │
-│  │  • NAT Gateway (for private subnet internet access)      │  │
+│  │  ┌─────────────────────────────────────────────────┐     │  │
+│  │  │  Application Load Balancer (ALB)                │     │  │
+│  │  │  • HTTP Listener: Port 80                       │     │  │
+│  │  │  • Health Check: GET /health every 30s          │     │  │
+│  │  │  • Target Group: EC2 instances on port 8080     │     │  │
+│  │  └──────────────────┬──────────────────────────────┘     │  │
+│  │                     │                                    │  │
+│  │       ┌─────────────┼─────────────┐                      │  │
+│  │       ▼             ▼             ▼                      │  │
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐                   │  │
+│  │  │  EC2 #1 │  │  EC2 #2 │  │  EC2 #3 │  ...              │  │
+│  │  │  Go App │  │  Go App │  │  Go App │                   │  │
+│  │  │  :8080  │  │  :8080  │  │  :8080  │                   │  │
+│  │  └─────────┘  └─────────┘  └─────────┘                   │  │
+│  │                                                          │  │
+│  │  Auto Scaling Group                                      │  │
+│  │  • Min: 1  Desired: 2  Max: 4                            │  │
+│  │  • Scale Up:   CPU > 70% for 2 min → +1 instance         │  │
+│  │  • Scale Down: CPU < 20% for 2 min → -1 instance         │  │
+│  │  • Target: 50% average CPU                               │  │
+│  │  • Zero-downtime deploys via instance refresh            │  │
+│  └───────────────────────┬──────────────────────────────────┘  │
+│                          │                                     │
+│  ┌───────────────────────▼──────────────────────────────────┐  │
+│  │               Private Subnets (2 Availability Zones)     │  │
+│  │                                                          │  │
+│  │  ┌─────────────────────────────────────────────────┐     │  │
+│  │  │  AWS RDS MySQL 8.0                              │     │  │
+│  │  │  • Multi-AZ Deployment (automatic failover)     │     │  │
+│  │  │  • Storage auto-scaling: 20 → 100 GB            │     │  │
+│  │  │  • Automated backups (7-day retention)          │     │  │
+│  │  │  • Encryption at rest                           │     │  │
+│  │  └─────────────────────────────────────────────────┘     │  │
 │  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+│                                                                │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  Supporting Services                                     │  │
+│  │                                                          │  │
+│  │  AWS Secrets Manager  → DB credentials (no plaintext)    │  │
+│  │  CloudWatch Logs      → /aws/ec2/{env}/application       │  │
+│  │                          /aws/ec2/{env}/error            │  │
+│  │                          /aws/ec2/{env}/system           │  │
+│  │  CloudWatch Metrics   → ALB, EC2, RDS dashboards         │  │
+│  │  CloudWatch Alarms    → CPU high/low, error rate alerts  │  │
+│  │  S3 Bucket            → ALB access logs                  │  │
+│  │  NAT Gateway          → Private subnet internet access   │  │
+│  └──────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────┘
 ```
-
-### Auto-scaling Policies
-
-```
-CloudWatch Metrics → Auto Scaling Decisions:
-
-┌─────────────────────────────────────────────────────────┐
-│ CPU Utilization                                         │
-│ 100% │███████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░│ │
-│  80% │███████████████████████████░░░░░░░░░░░ Threshold│ │
-│  70% │███████████████████████████████░░░░░░ (Scale Up)│ │
-│  50% │███████████████████████████████████████░░░░░░░░│ │ ← Target
-│  20% │███████████████████████████████████████████████│ │ ← Scale Down
-│   0% └───────────────────────────────────────────────┘ │
-│       Time →                                            │
-└─────────────────────────────────────────────────────────┘
-
-Scaling Policies:
-  1. Simple Scaling:
-     • CPU > 70% for 2 min  → Add 1 instance
-     • CPU < 20% for 2 min  → Remove 1 instance
-     • Cooldown: 5 minutes
-
-  2. Target Tracking:
-     • Maintain 50% average CPU utilization
-     • ALB automatically adjusts instance count
-
-Current State Example:
-  ┌────────────────────────────────────┐
-  │ Instances: 2 (Desired)             │
-  │ Min: 1, Max: 4                     │
-  │ Average CPU: 45%                   │
-  │ Health Status: 2/2 Healthy         │
-  │ Action: Stable (no scaling needed) │
-  └────────────────────────────────────┘
-```
-
-### CloudWatch Monitoring
-
-```
-Log Groups:
-  /aws/ec2/{env}/application  → Application output
-  /aws/ec2/{env}/error        → Error tracking
-  /aws/ec2/{env}/system       → System/OS logs
-  /aws/ec2/{env}/access       → Access logs
-
-Metrics Collected:
-  • ALB: Request count, latency, HTTP codes
-  • EC2: CPU, memory, disk, network
-  • RDS: Connections, CPU, storage, replication lag
-  • Custom: Error rate, API response times
-
-Alarms Configured:
-  ┌─────────────────────────────────────────┐
-  │ ⚠️  High CPU (>70%)     → Scale up     │
-  │ ℹ️  Low CPU (<20%)      → Scale down   │
-  │ 🚨 High Error Rate      → Alert team   │
-  │ 📊 Dashboard Available  → Real-time    │
-  └─────────────────────────────────────────┘
-```
-
-## 🔐 Security Layers (Optional/Future)
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   1. API Gateway                    │
-│            (Rate Limiting, DDoS Protection)         │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                2. Authentication                    │
-│          (JWT, OAuth 2.0, API Keys)                 │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                3. Authorization                     │
-│         (RBAC, Resource-based Permissions)          │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                4. Data Validation                   │
-│          (Input Sanitization, Type Checking)        │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                5. Business Logic                    │
-│              (Service Layer)                        │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│                6. Data Access                       │
-│         (Prepared Statements, Encryption)           │
-└─────────────────────────────────────────────────────┘
-```
-
-## 📈 Scalability Strategy
-
-### Vertical Scaling (Single Instance)
-```
-┌─────────────────┐
-│   2 CPU Cores   │  →  ┌─────────────────┐
-│   4 GB RAM      │      │   4 CPU Cores   │
-│   100 GB Disk   │      │   8 GB RAM      │
-└─────────────────┘      │   200 GB Disk   │
-                         └─────────────────┘
-  Good for: Early stage, simple deployments
-  Limits: Hardware constraints, single point of failure
-```
-
-### Horizontal Scaling (Multiple Instances) - IMPLEMENTED
-```
-┌──────────┐
-│ EC2 #1   │ ────┐
-│ Go App   │     │
-└──────────┘     │
-                 │     ┌──────────────────────┐
-┌──────────┐     ├────►│ Application Load     │◄──── Internet
-│ EC2 #2   │ ────┤     │ Balancer (ALB)       │
-│ Go App   │     │     └──────────────────────┘
-└──────────┘     │
-                 │        Auto Scaling Group
-┌──────────┐     │        • Min: 1, Max: 4
-│ EC2 #3   │ ────┤        • Health Checks
-│ Go App   │     │        • Rolling Updates
-└──────────┘     │
-                 │
-┌──────────┐     │
-│ EC2 #4   │ ────┘
-│ Go App   │ (scales based on demand)
-└──────────┘
-
-  ✅ Implemented: Production, high availability
-  ✅ Benefits: No single point of failure, handles load spikes
-  ✅ Features: Auto-scaling, health checks, zero-downtime deploys
-```
-
-### Database Scaling
-```
-┌──────────────┐
-│   Primary    │ ◄──── Writes
-│  (Read/Write)│
-└───────┬──────┘
-        │ Replication
-        ├───────────────────┐
-        │                   │
-        ▼                   ▼
-┌──────────────┐    ┌──────────────┐
-│  Replica 1   │    │  Replica 2   │
-│  (Read Only) │    │  (Read Only) │
-└──────────────┘    └──────────────┘
-        ▲                   ▲
-        └───────────────────┴───── Read Queries
-```
-
-## 🔄 CI/CD Pipeline
-
-```
-Developer                GitLab              CI/CD                 AWS
-    │                      │                   │                     │
-    │ git push            │                   │                     │
-    ├────────────────────►│                   │                     │
-    │                      │ Trigger Pipeline │                     │
-    │                      ├──────────────────►│                     │
-    │                      │                   │                     │
-    │                      │              ┌────▼─────┐              │
-    │                      │              │  Build   │              │
-    │                      │              │  Test    │              │
-    │                      │              │  Lint    │              │
-    │                      │              └────┬─────┘              │
-    │                      │                   │                     │
-    │                      │              ┌────▼─────┐              │
-    │                      │              │  Build   │              │
-    │                      │              │  Docker  │              │
-    │                      │              │  Image   │              │
-    │                      │              └────┬─────┘              │
-    │                      │                   │                     │
-    │                      │                   │ Push Image         │
-    │                      │              ┌────▼─────┐              │
-    │                      │              │ Registry │              │
-    │                      │              └────┬─────┘              │
-    │                      │                   │                     │
-    │                      │                   │ Deploy              │
-    │                      │                   ├────────────────────►│
-    │                      │                   │                     │
-    │                      │              ┌────▼─────┐         ┌────▼────┐
-    │                      │              │ Health   │         │ Running │
-    │                      │              │ Check    │         │  Pods   │
-    │                      │              └──────────┘         └─────────┘
-```
-
-## 📊 Monitoring & Observability
-
-```
-Application                Metrics                Visualization
-    │                         │                         │
-    │ Prometheus metrics      │                         │
-    ├────────────────────────►│                         │
-    │ /metrics endpoint       │                         │
-    │                         │ Scrape                  │
-    │                     ┌───▼────┐                   │
-    │                     │Prometh-│                   │
-    │                     │  eus   │                   │
-    │                     └───┬────┘                   │
-    │                         │                         │
-    │                         │ Query                   │
-    │                         ├────────────────────────►│
-    │                         │                    ┌────▼────┐
-    │ Logs                    │                    │ Grafana │
-    ├─────────────────────────┼───────────────────►│Dashboard│
-    │ JSON structured         │                    └─────────┘
-    │                         │
-    │                    ┌────▼────┐
-    │ Errors/Traces      │  ELK/   │
-    └───────────────────►│Datadog  │
-                         └─────────┘
-```
-
-## 🎯 Technology Decisions
-
-| Component | Options Considered | Choice | Rationale |
-|-----------|-------------------|--------|-----------|
-| Web Framework | net/http, Gin, Mux, Echo | **Gorilla Mux** | Standard, lightweight, excellent routing, no bloat |
-| Database | PostgreSQL, MySQL, DynamoDB | **AWS RDS MySQL 8.0** | Proven reliability, good timezone support, managed service, cost-effective |
-| Database Driver | GORM, sqlx, raw SQL | **database/sql + AWS SDK** | Direct control, no ORM overhead, native AWS integration |
-| Load Balancer | Nginx, HAProxy, ALB | **AWS Application Load Balancer** | Managed service, health checks, auto-scaling integration |
-| Compute | ECS, EKS, EC2 | **EC2 with Auto Scaling Group** | Simpler than K8s, cost-effective, suitable for monolith |
-| Monitoring | Prometheus, Datadog, CloudWatch | **AWS CloudWatch** | Native AWS integration, logs + metrics unified, cost-effective |
-| IaC | Terraform, CloudFormation, Pulumi | **Terraform** | Multi-cloud capable, declarative, mature ecosystem |
-| CI/CD | GitHub Actions, GitLab CI, Jenkins | **GitLab CI (Planned)** | Integrated, powerful, YAML-based |
-
-## 📚 Next Steps
-
-1. Review the [Implementation Plan](./IMPLEMENTATION_PLAN.md) for detailed phases
-2. Check the [Quick Start Guide](./QUICKSTART.md) to begin implementation
-3. Use the [Checklist](./CHECKLIST.md) to track progress
-4. Start with Phase 1: Project Setup
-
-**Understanding the architecture is key to successful implementation!** 🎯

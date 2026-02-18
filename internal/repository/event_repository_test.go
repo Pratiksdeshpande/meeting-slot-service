@@ -46,7 +46,7 @@ func TestEventRepository_Create(t *testing.T) {
 
 		mock.ExpectExec("INSERT INTO events").
 			WithArgs(event.ID, event.Title, event.Description, event.OrganizerID,
-				event.DurationMinutes, event.Status).
+				event.DurationMinutes, event.Status, sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		err := repo.Create(context.Background(), event)
@@ -84,12 +84,12 @@ func TestEventRepository_Create(t *testing.T) {
 
 		mock.ExpectExec("INSERT INTO events").
 			WithArgs(event.ID, event.Title, event.Description, event.OrganizerID,
-				event.DurationMinutes, event.Status).
+				event.DurationMinutes, event.Status, sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		for _, slot := range event.ProposedSlots {
 			mock.ExpectExec("INSERT INTO proposed_slots").
-				WithArgs(event.ID, slot.StartTime, slot.EndTime, slot.Timezone).
+				WithArgs(event.ID, slot.StartTime, slot.EndTime, slot.Timezone, sqlmock.AnyArg()).
 				WillReturnResult(sqlmock.NewResult(1, 1))
 		}
 
@@ -113,7 +113,7 @@ func TestEventRepository_Create(t *testing.T) {
 
 		mock.ExpectExec("INSERT INTO events").
 			WithArgs(event.ID, event.Title, event.Description, event.OrganizerID,
-				event.DurationMinutes, event.Status).
+				event.DurationMinutes, event.Status, sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnError(errors.New("database error"))
 
 		err := repo.Create(context.Background(), event)
@@ -146,11 +146,11 @@ func TestEventRepository_Create(t *testing.T) {
 
 		mock.ExpectExec("INSERT INTO events").
 			WithArgs(event.ID, event.Title, event.Description, event.OrganizerID,
-				event.DurationMinutes, event.Status).
+				event.DurationMinutes, event.Status, sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		mock.ExpectExec("INSERT INTO proposed_slots").
-			WithArgs(event.ID, event.ProposedSlots[0].StartTime, event.ProposedSlots[0].EndTime, event.ProposedSlots[0].Timezone).
+			WithArgs(event.ID, event.ProposedSlots[0].StartTime, event.ProposedSlots[0].EndTime, event.ProposedSlots[0].Timezone, sqlmock.AnyArg()).
 			WillReturnError(errors.New("slot creation error"))
 
 		err := repo.Create(context.Background(), event)

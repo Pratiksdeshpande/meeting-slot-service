@@ -52,7 +52,7 @@ If you have MySQL Server installed locally (e.g., MySQL Community Server):
 
 ```powershell
 # Clone the repository
-git clone https://github.com/yourusername/meeting-slot-service.git
+git clone https://github.com/Pratiksdeshpande/meeting-slot-service.git
 cd meeting-slot-service
 
 # Install dependencies
